@@ -228,7 +228,14 @@ export default function App() {
           <h2>Cuenta</h2>
           <div className="kpi">
             <span>Saldo disponible</span>
-            <span className="v">{fmt(s?.available_quote)} {s?.quote_asset}</span>
+            <span className="v">
+              {fmt(s?.available_quote)} {s?.quote_asset}
+              {s?.available_quote_stale && (
+                <span className="badge amber" title="No se pudo leer el saldo en el último ciclo; no se abrirán posiciones hasta poder leerlo">
+                  {" "}sin actualizar
+                </span>
+              )}
+            </span>
           </div>
           <div className="kpi">
             <span>Posiciones abiertas</span>

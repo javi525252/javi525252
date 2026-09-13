@@ -51,7 +51,7 @@ No uses herramientas ni leas archivos: razona solo sobre los datos de abajo.
 
 ### DATOS DEL CICLO
 ```json
-%s
+{contexto}
 ```
 """
 
@@ -72,7 +72,9 @@ def build_command(context: dict) -> list[str]:
     o Python no sabe lanzarlo.
     """
     args = [
-        "-p", _INSTRUCTION % json.dumps(context, ensure_ascii=False, indent=1),
+        "-p", _INSTRUCTION.replace(
+            "{contexto}", json.dumps(context, ensure_ascii=False, indent=1)
+        ),
         "--output-format", "json",
         "--max-turns", "1",
     ]

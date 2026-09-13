@@ -1,7 +1,7 @@
 """Capa de exchange: precisión, mínimos y confirmación de fills."""
 import pytest
 
-from bot.exchange import Exchange, ExchangeError
+from bot.exchange import Exchange, ExchangeError, OrderUnconfirmed
 
 
 class FakeHTTP:
@@ -136,12 +136,66 @@ def test_orden_rechazada_lanza_error():
         Exchange(session=http).market_buy("BTCUSDT", 100.0)
 
 
-def test_fill_sin_confirmar_lanza_error():
+def test_fill_sin_confirmar_lanza_orden_sin_confirmar():
+    """El caso peligroso: la orden se envió y no sabemos cómo quedó."""
     http = FakeHTTP(
         get_instruments_info=OK_INSTRUMENT,
         place_order={"retCode": 0, "result": {"orderId": "x"}},
         get_order_history={"retCode": 0, "result": {"list": [{"orderStatus": "New"}]}},
     )
     ex = Exchange(session=http)
-    with pytest.raises(ExchangeError, match="No se pudo confirmar"):
-        ex._fill_result("BTCUSDT", "x", retries=2, pause=0.0)
+    with pytest.raises(OrderUnconfirmed) as exc:
+        ex._fill_result("BTCUSDT", "x", side="Buy", retries=2, pause=0.0)
+    assert exc.value.order_id == "x"
+    assert exc.value.symbol == "BTCUSDT"
+    assert exc.value.side == "Buy"
+
+
+def test_fill_devuelve_la_moneda_de_la_comision():
+    """Sin saber en qué moneda se cobró, el PnL mezclaría unidades."""
+    http = FakeHTTP(
+        get_instruments_info=OK_INSTRUMENT,
+        place_order={"retCode": 0, "result": {"orderId": "b"}},
+        get_order_history={"retCode": 0, "result": {"list": [{
+            "orderStatus": "Filled", "cumExecQty": "0.002", "cumExecValue": "100",
+            "avgPrice": "50000", "cumExecFee": "0.000002", "feeCurrency": "BTC"}]}},
+    )
+    fill = Exchange(session=http).market_buy("BTCUSDT", 100.0)
+    assert fill["fee_currency"] == "BTC"
+    assert fill["fee"] == 0.000002
+
+
+def test_venta_reintenta_con_recorte_si_falta_saldo():
+    """
+    Quedarse sin poder salir es el peor fallo posible: si Bybit rechaza por
+    saldo insuficiente (decimales de la comisión), se reintenta con un 0,1%
+    menos en vez de dejar la posición atrapada.
+    """
+    http = FakeHTTP(
+        get_instruments_info=OK_INSTRUMENT,
+        place_order=[
+            {"retCode": 170131, "retMsg": "Insufficient balance"},
+            {"retCode": 0, "result": {"orderId": "s2"}},
+        ],
+        get_order_history={"retCode": 0, "result": {"list": [{
+            "orderStatus": "Filled", "cumExecQty": "0.000999",
+            "cumExecValue": "50.0", "avgPrice": "50050",
+            "cumExecFee": "0.05", "feeCurrency": "USDT"}]}},
+    )
+    ex = Exchange(session=http)
+    fill = ex.market_sell("BTCUSDT", 0.001)
+    assert fill["order_id"] == "s2"
+
+    ordenes = [kw["qty"] for name, kw in http.calls if name == "place_order"]
+    assert ordenes == ["0.001000", "0.000999"]     # segundo intento recortado
+
+
+def test_venta_no_reintenta_ante_un_rechazo_que_no_es_de_saldo():
+    http = FakeHTTP(
+        get_instruments_info=OK_INSTRUMENT,
+        place_order={"retCode": 10001, "retMsg": "params error"},
+    )
+    with pytest.raises(ExchangeError, match="params error"):
+        Exchange(session=http).market_sell("BTCUSDT", 0.001)
+    intentos = [1 for name, _ in http.calls if name == "place_order"]
+    assert len(intentos) == 1

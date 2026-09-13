@@ -27,6 +27,30 @@ class ExchangeError(Exception):
     """Cualquier problema hablando con Bybit (red, credenciales o rechazo)."""
 
 
+class OrderUnconfirmed(ExchangeError):
+    """
+    La orden SE HA ENVIADO pero no hemos podido confirmar cómo quedó.
+
+    Es el caso peligroso: puede haberse ejecutado en el exchange sin que el bot
+    se entere. Lleva el `order_id` para poder buscarla y avisar a quien opera.
+    """
+
+    def __init__(self, message: str, symbol: str, order_id: str, side: str):
+        super().__init__(message)
+        self.symbol = symbol
+        self.order_id = order_id
+        self.side = side
+
+
+#: Fragmentos con los que Bybit indica que no hay saldo para la venta.
+_INSUFFICIENT = ("insufficient", "not enough", "170131", "170193")
+
+
+def _is_insufficient_balance(err: Exception) -> bool:
+    msg = str(err).lower()
+    return any(token in msg for token in _INSUFFICIENT)
+
+
 class Exchange:
     def __init__(self, session: HTTP | None = None):
         if session is not None:  # inyección para tests
@@ -181,10 +205,17 @@ class Exchange:
                        category="spot", symbol=symbol, side="Buy",
                        orderType="Market", qty=f"{quote_usdt:.2f}",
                        marketUnit="quoteCoin")
-        return self._fill_result(symbol, r["orderId"])
+        return self._fill_result(symbol, r["orderId"], side="Buy")
 
-    def market_sell(self, symbol: str, base_qty: float) -> dict:
-        """Vende a mercado `base_qty` del activo base. Devuelve el fill real."""
+    def market_sell(self, symbol: str, base_qty: float, _retry: bool = True) -> dict:
+        """
+        Vende a mercado `base_qty` del activo base. Devuelve el fill real.
+
+        No poder salir de una posición es el peor fallo posible, así que si
+        Bybit rechaza por saldo insuficiente (típico cuando la comisión se
+        cobró en el activo base y quedan unos decimales menos) se reintenta
+        una vez con un recorte del 0,1%.
+        """
         inst = self.get_instrument(symbol)
         qty_str = self.floor_to_precision(base_qty, inst["base_precision"])
         if float(qty_str) <= 0:
@@ -194,13 +225,20 @@ class Exchange:
                 f"{symbol}: cantidad {qty_str} por debajo del mínimo "
                 f"({inst['min_order_qty']})"
             )
-        r = self._call(self.session.place_order, "place_order(Sell)",
-                       category="spot", symbol=symbol, side="Sell",
-                       orderType="Market", qty=qty_str, marketUnit="baseCoin")
-        return self._fill_result(symbol, r["orderId"])
+        try:
+            r = self._call(self.session.place_order, "place_order(Sell)",
+                           category="spot", symbol=symbol, side="Sell",
+                           orderType="Market", qty=qty_str, marketUnit="baseCoin")
+        except OrderUnconfirmed:
+            raise
+        except ExchangeError as e:
+            if _retry and _is_insufficient_balance(e):
+                return self.market_sell(symbol, float(qty_str) * 0.999, _retry=False)
+            raise
+        return self._fill_result(symbol, r["orderId"], side="Sell")
 
-    def _fill_result(self, symbol: str, order_id: str, retries: int = 8,
-                     pause: float = 0.5) -> dict:
+    def _fill_result(self, symbol: str, order_id: str, side: str = "",
+                     retries: int = 8, pause: float = 0.5) -> dict:
         """
         Consulta el resultado REAL de una orden de mercado (precio medio,
         cantidad y comisión). Reintenta porque el historial tarda un instante
@@ -225,6 +263,10 @@ class Exchange:
                             "exec_value": exec_val or avg * exec_qty,
                             "avg_price": avg,
                             "fee": float(o.get("cumExecFee") or 0),
+                            # Spot cobra la comisión de compra en el activo
+                            # base y la de venta en el de cotización: sin saber
+                            # cuál es, el PnL mezclaría unidades.
+                            "fee_currency": o.get("feeCurrency") or "",
                         }
                     if status in ("Rejected", "Cancelled", "Deactivated"):
                         raise ExchangeError(
@@ -234,7 +276,8 @@ class Exchange:
                 if "terminó en estado" in str(e):
                     raise
             time.sleep(pause)
-        raise ExchangeError(
-            f"No se pudo confirmar la ejecución de {order_id} ({symbol}). "
-            f"Último estado conocido: {last.get('orderStatus', 'desconocido')}"
+        raise OrderUnconfirmed(
+            f"No se pudo confirmar la ejecución de la orden {order_id} ({symbol}). "
+            f"Último estado conocido: {last.get('orderStatus', 'desconocido')}",
+            symbol=symbol, order_id=order_id, side=side,
         )

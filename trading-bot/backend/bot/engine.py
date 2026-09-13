@@ -45,6 +45,7 @@ class BotEngine:
         self._subscribers: set[asyncio.Queue] = set()
         self._last_tickers: dict[str, dict] = {}
         self._available_quote: float = 0.0
+        self._quote_stale: bool = True   # ¿el saldo que tenemos es de fiar?
         self._last_decision: dict | None = None
         self._stop_event: asyncio.Event | None = None
 
@@ -78,6 +79,7 @@ class BotEngine:
             "poll_count": self.poll_count,
             "uptime_sec": round(time.time() - self.started_at) if self.started_at else 0,
             "available_quote": round(self._available_quote, 2),
+            "available_quote_stale": self._quote_stale,
             "quote_asset": self.settings.get("quote_asset", "USDT"),
             "tickers": self._last_tickers,
             "open_positions": state.get_open_positions(),
@@ -126,6 +128,7 @@ class BotEngine:
                 self.ex.get_available_quote, self.settings["quote_asset"]
             )
             self._available_quote = bal
+            self._quote_stale = False
             state.ensure_daily(bal)
         except ExchangeError as e:
             state.add_log("warn", f"No se pudo leer el saldo inicial: {e}")
@@ -170,8 +173,13 @@ class BotEngine:
             self._available_quote = await asyncio.to_thread(
                 self.ex.get_available_quote, self.settings["quote_asset"]
             )
+            self._quote_stale = False
             state.ensure_daily(self._available_quote)
         except ExchangeError as e:
+            # Nos quedamos con el saldo anterior para poder seguir mostrando
+            # estado, pero marcado como NO fiable: dimensionar una compra con
+            # un saldo viejo es justo el tipo de error que cuesta dinero.
+            self._quote_stale = True
             state.add_log("warn", f"No se pudo leer el saldo: {e}")
 
         # 1) Salidas automáticas: SIEMPRE, pase lo que pase.
@@ -269,6 +277,11 @@ class BotEngine:
             state.mark_decision_applied(dec_id, 0, None)
 
     async def _apply_open(self, dec: dict, dec_id: int) -> None:
+        if self._quote_stale:
+            motivo = "saldo no fiable (falló la lectura en Bybit este ciclo)"
+            state.mark_decision_applied(dec_id, 0, motivo)
+            state.add_log("warn", f"OPEN pospuesto: {motivo}")
+            return
         verdict = risk.evaluate_open(dec, self.settings, self._available_quote)
         if not verdict.allowed:
             state.mark_decision_applied(dec_id, 0, verdict.reason)

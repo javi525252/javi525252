@@ -66,6 +66,14 @@ ciclos (rutina), o cuando tú pulsas «Decidir ahora». Con eso salen de sobra t
   posiciones nuevas al instante.
 - Ante cualquier fallo del LLM (timeout, salida rara, CLI caído) la decisión es
   **HOLD**: el bot nunca opera a ciegas.
+- **Reserva de cierre**: una posición solo puede estar vendiéndose por un
+  camino a la vez, así que una salida automática y un cierre manual
+  simultáneos no pueden mandar dos ventas de lo mismo.
+- Si no se puede leer el saldo en un ciclo, **no se abre nada** hasta poder
+  leerlo: dimensionar una compra con un saldo viejo es operar a ciegas.
+- Si una orden se envía y no se puede confirmar cómo quedó, el bot **no la da
+  por hecha ni la reintenta**: lo registra como error bien visible para que la
+  revises a mano en Bybit.
 
 ---
 
@@ -261,6 +269,30 @@ logueado con tu suscripción, porque ahí es donde se ejecuta `claude -p`.
   `poll_interval_sec`.
 - **El bot arranca pero no ve precios** → suele ser red o firewall bloqueando
   `api.bybit.com`; el bot lo registra como aviso y sigue vivo reintentando.
+
+---
+
+## 🚧 Límites que debes conocer
+
+Ninguno es un fallo: son consecuencias del diseño. Merece la pena tenerlos
+claros antes de poner dinero real.
+
+- **El stop-loss lo ejecuta el bot, no el exchange.** Se comprueba en cada
+  latido (60 s por defecto), así que un desplome brusco *entre* dos latidos
+  puede saltárselo y salir peor de lo previsto. Si te importa, baja
+  `poll_interval_sec`; aun así no equivale a una orden condicional puesta en
+  Bybit.
+- **El cortacircuitos mira la pérdida realizada del día, no la flotante.** Si
+  las posiciones abiertas van muy en contra pero aún no se han cerrado, no
+  salta. Los que acotan eso son el stop-loss y el tope de posiciones.
+- **El saldo inicial del día se fija en el primer ciclo tras medianoche UTC.**
+  Si arrancas el bot a media tarde, el límite porcentual se calcula sobre el
+  saldo de ese momento, no sobre el de la mañana.
+- **Una orden sin confirmar necesita que mires tú.** Es raro (red caída justo
+  al enviar), pero cuando pasa el bot se planta y avisa en vez de arriesgarse a
+  comprar o vender dos veces.
+- **El bot no reconstruye posiciones que no abrió él.** Lo que compres a mano
+  en Bybit le es invisible y no tendrá stop-loss.
 
 ---
 

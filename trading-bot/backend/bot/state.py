@@ -71,9 +71,11 @@ CREATE TABLE IF NOT EXISTS positions (
     qty           REAL    NOT NULL,   -- cantidad del activo base
     entry_price   REAL    NOT NULL,
     entry_usdt    REAL    NOT NULL,   -- USDT realmente gastados
-    entry_fee     REAL    DEFAULT 0,
+    entry_fee     REAL    DEFAULT 0,   -- comisión de compra YA en moneda de cotización
+    fee_currency  TEXT,                -- moneda en la que Bybit la cobró (auditoría)
     opened_at     TEXT    NOT NULL,
     status        TEXT    NOT NULL,   -- 'open' | 'closed'
+    closing       INTEGER DEFAULT 0,  -- 1 mientras se está ejecutando la venta
     peak_price    REAL,               -- máximo visto (para el trailing stop)
     close_price   REAL,
     closed_at     TEXT,
@@ -175,7 +177,8 @@ def reset_settings() -> None:
 # ---------------------------------------------------------------------------
 def add_position(symbol: str, side: str, qty: float, entry_price: float,
                  entry_usdt: float, order_id: str | None,
-                 decision_id: int | None, entry_fee: float = 0.0) -> int:
+                 decision_id: int | None, entry_fee: float = 0.0,
+                 fee_currency: str | None = None) -> int:
     with _lock:
         c = get_conn()
         with c:
@@ -185,10 +188,10 @@ def add_position(symbol: str, side: str, qty: float, entry_price: float,
             )
             cur = c.execute(
                 "INSERT INTO positions(symbol, side, qty, entry_price, entry_usdt, "
-                "entry_fee, opened_at, status, peak_price, order_id, decision_id) "
-                "VALUES(?,?,?,?,?,?,?,'open',?,?,?)",
-                (symbol, side, qty, entry_price, entry_usdt, entry_fee, _now(),
-                 entry_price, order_id, decision_id),
+                "entry_fee, fee_currency, opened_at, status, closing, peak_price, "
+                "order_id, decision_id) VALUES(?,?,?,?,?,?,?,?,'open',0,?,?,?)",
+                (symbol, side, qty, entry_price, entry_usdt, entry_fee, fee_currency,
+                 _now(), entry_price, order_id, decision_id),
             )
             c.execute(
                 "UPDATE daily SET trades_opened = COALESCE(trades_opened,0) + 1 "
@@ -208,6 +211,38 @@ def update_peak_price(pos_id: int, price: float) -> None:
                 "WHERE id=? AND status='open'",
                 (price, pos_id),
             )
+
+
+def claim_position_for_close(pos_id: int) -> dict | None:
+    """
+    Reserva una posición para venderla, de forma atómica.
+
+    Devuelve la posición si esta llamada ha ganado la carrera, o None si ya
+    estaba cerrada o si otro camino (salida automática, cierre manual desde el
+    panel, decisión del LLM) la está vendiendo ya. Sin esto, dos caminos
+    simultáneos podrían mandar DOS ventas a mercado de la misma posición.
+    """
+    with _lock:
+        c = get_conn()
+        with c:
+            cur = c.execute(
+                "UPDATE positions SET closing=1 "
+                "WHERE id=? AND status='open' AND COALESCE(closing,0)=0",
+                (pos_id,),
+            )
+            if cur.rowcount != 1:
+                return None
+            row = c.execute("SELECT * FROM positions WHERE id=?", (pos_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def release_position(pos_id: int) -> None:
+    """Libera una reserva cuando la venta no ha llegado a ejecutarse."""
+    with _lock:
+        c = get_conn()
+        with c:
+            c.execute("UPDATE positions SET closing=0 WHERE id=? AND status='open'",
+                      (pos_id,))
 
 
 def close_position(pos_id: int, close_price: float, close_reason: str,
@@ -230,14 +265,18 @@ def close_position(pos_id: int, close_price: float, close_reason: str,
 
             qty = qty_sold if qty_sold is not None else row["qty"]
             gross_out = close_price * qty
+            # `entry_fee` y `exit_fee` llegan YA convertidos a la moneda de
+            # cotización por el executor (ver executor.quote_fee): cuando Bybit
+            # cobra la comisión en el activo base su efecto ya está en `qty`,
+            # así que allí se guarda 0 y aquí no hay nada que descontar.
             entry_fee = row["entry_fee"] or 0.0
             pnl_usdt = gross_out - row["entry_usdt"] - entry_fee - exit_fee
             pnl_pct = (pnl_usdt / row["entry_usdt"] * 100.0) if row["entry_usdt"] else 0.0
 
             c.execute(
-                "UPDATE positions SET status='closed', close_price=?, closed_at=?, "
-                "exit_fee=?, pnl_usdt=?, pnl_pct=?, close_reason=?, close_order_id=? "
-                "WHERE id=?",
+                "UPDATE positions SET status='closed', closing=0, close_price=?, "
+                "closed_at=?, exit_fee=?, pnl_usdt=?, pnl_pct=?, close_reason=?, "
+                "close_order_id=? WHERE id=?",
                 (close_price, _now(), exit_fee, pnl_usdt, pnl_pct, close_reason,
                  close_order_id, pos_id),
             )

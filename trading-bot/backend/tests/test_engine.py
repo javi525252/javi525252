@@ -15,6 +15,7 @@ def bot(monkeypatch):
     e.ex = FakeExchange(price=100.0)
     e.settings = state.get_settings()
     e._available_quote = 1000.0
+    e._quote_stale = False
     # Nunca llamamos al LLM de verdad en los tests.
     monkeypatch.setattr(engine_mod.decision, "ask_decision",
                         lambda ctx: engine_mod.decision.hold("test"))
@@ -130,6 +131,31 @@ def test_decision_close_cierra_la_posicion(bot, monkeypatch):
     run(bot._run_decision("event", "BTCUSDT"))
     assert state.get_open_positions() == []
     assert state.get_recent_trades()[0]["close_reason"] == "llm"
+
+
+def test_no_se_abre_con_saldo_no_fiable(bot, monkeypatch):
+    """Dimensionar una compra con un saldo viejo es como operar a ciegas."""
+    monkeypatch.setattr(
+        engine_mod.decision, "ask_decision",
+        lambda ctx: {"action": "OPEN", "symbol": "BTCUSDT", "position_id": None,
+                     "confidence": 0.95, "size_fraction": 1.0,
+                     "reasoning": "señal clara", "_cost_usd": None})
+    bot._quote_stale = True
+    run(bot._run_decision("manual", None))
+    assert state.get_open_positions() == []
+    assert "saldo no fiable" in state.get_recent_decisions(1)[0]["veto_reason"]
+
+
+def test_saldo_ilegible_marca_el_estado_como_no_fiable(bot):
+    class SinSaldo(FakeExchange):
+        def get_available_quote(self, quote="USDT"):
+            from bot.exchange import ExchangeError
+            raise ExchangeError("timeout")
+
+    bot.ex = SinSaldo(price=100.0)
+    run(bot._cycle())
+    assert bot._quote_stale is True
+    assert bot.snapshot()["available_quote_stale"] is True
 
 
 def test_hold_no_toca_nada(bot):
