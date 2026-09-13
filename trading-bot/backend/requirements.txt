@@ -1,0 +1,11 @@
+# --- Núcleo del bot ---
+pybit==5.17.0            # SDK oficial de Bybit V5 (spot + testnet integrado)
+pandas==2.2.3            # cálculo de indicadores
+numpy==2.1.3
+python-dotenv==1.0.1     # carga del .env
+httpx==0.27.2            # HTTP (índice Fear & Greed)
+
+# --- API + dashboard ---
+fastapi==0.115.5
+uvicorn[standard]==0.32.1   # servidor ASGI con WebSocket
+pydantic==2.10.3

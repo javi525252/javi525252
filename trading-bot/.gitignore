@@ -1,0 +1,21 @@
+# Secretos y estado local
+backend/.env
+backend/bot_state.db
+backend/bot_state.db-wal
+backend/bot_state.db-shm
+backend/KILL_SWITCH
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Varios
+.DS_Store
+Thumbs.db

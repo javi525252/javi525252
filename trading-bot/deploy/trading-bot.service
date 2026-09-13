@@ -1,0 +1,32 @@
+# Servicio systemd para dejar el bot 24/7 en un VPS Linux.
+#
+#   sudo cp deploy/trading-bot.service /etc/systemd/system/
+#   sudo nano /etc/systemd/system/trading-bot.service   # ajusta User y rutas
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now trading-bot
+#   journalctl -u trading-bot -f                        # ver el log en vivo
+#
+# Importante: el usuario del servicio debe tener Claude Code instalado y con la
+# sesión iniciada, porque ahí es donde se ejecuta `claude -p`.
+
+[Unit]
+Description=Bot de trading autonomo (Bybit spot + Claude Code)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=javi
+WorkingDirectory=/home/javi/trading-bot/backend
+ExecStart=/home/javi/trading-bot/backend/.venv/bin/python main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Endurecimiento básico
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
