@@ -1,5 +1,5 @@
 /* Service worker: la app funciona sin conexión una vez instalada. */
-const CACHE = 'bxrec-v1';
+const CACHE = 'bxrec-v2';
 const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
   'icons/logo-256.png', 'icons/favicon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png'];
 

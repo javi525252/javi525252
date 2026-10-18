@@ -21,8 +21,20 @@ Web app (PWA) 100% estática: todo se procesa y guarda en el navegador del usuar
 | Firefox escritorio | ✅ | ✅ | PiP estándar |
 | Safari macOS | ✅ | ✅ | PiP estándar |
 | Chrome Android | ❌ (limitación del navegador) | ✅ | — |
+| **App Android (APK)** | ✅ | ✅ | ✅ (sobre cualquier app) |
 
-En Android los navegadores no permiten capturar la pantalla desde una web: para eso se usa el grabador nativo y se importa el vídeo.
+En Android los navegadores no permiten capturar la pantalla desde una web. Para eso está la **app nativa** (`android/`), que se descarga desde la propia web en `descargas/ballixart-rec.apk`.
+
+## App Android (`android/`)
+App nativa en Java (sin dependencias, Android 10+):
+- Graba la pantalla con MediaProjection + MediaRecorder (H.264/AAC, 720p o 1080p) y el micrófono.
+- Burbuja de cámara frontal flotante sobre cualquier app (arrastrar para mover, tocar para cambiar tamaño) con temporizador, pausa y stop.
+- Controles también desde la notificación. Cuenta atrás de 3 s.
+- Vídeos en `Películas/BallixartRec`, con biblioteca integrada: ver, compartir, renombrar, eliminar.
+
+Compilar: `./android/build.sh` (descarga las herramientas desde Maven Central y npm; no necesita Android Studio ni el SDK).
+Deja el APK firmado en `descargas/ballixart-rec.apk`. La clave de firma es `android/ballixart-rec.p12`
+(contraseña `ballixart`): consérvala para que las actualizaciones se instalen encima de la versión anterior.
 
 ## Despliegue
 Sitio estático: `netlify.toml` publica esta carpeta tal cual (sin build).

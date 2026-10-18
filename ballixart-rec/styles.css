@@ -90,6 +90,8 @@ h1, h2 { font-family: var(--display); font-stretch: 125%; color: var(--ballixart
 .mode-txt small { color: var(--muted); font-size: 13px; }
 
 .note { color: var(--muted); font-size: 13px; background: var(--navy-05); border-left: 3px solid var(--ballixart-blue); padding: 10px 12px; margin: 12px 0 0; }
+.note p { margin: 0 0 8px; }
+.android-dl { margin-top: 4px; width: 100%; }
 .note.small { font-size: 12px; background: none; border: 0; padding: 0; }
 
 .field { margin-bottom: 12px; }

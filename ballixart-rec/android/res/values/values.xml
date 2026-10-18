@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ballixart Rec</string>
+    <color name="white">#FFFFFFFF</color>
+    <color name="navy">#FF00147E</color>
+    <color name="blue">#FF008ACD</color>
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/navy</item>
+        <item name="android:colorPrimaryDark">@color/navy</item>
+        <item name="android:colorAccent">@color/blue</item>
+        <item name="android:statusBarColor">@color/navy</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:windowBackground">@color/white</item>
+    </style>
+</resources>
