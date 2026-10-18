@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ballixart Rec</title>
+  <meta name="description" content="Graba tu pantalla, tu cámara y tu voz. Grabador de vídeo de Ballixart para escritorio y Android.">
+  <meta name="theme-color" content="#00147E">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/favicon.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700;125,800&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" data-nav="record" aria-label="Ballixart Rec — inicio">
+      <img src="icons/logo-256.png" alt="Ballixart" width="44" height="44">
+      <span class="brand-name">BALLIXART <b>REC</b></span>
+    </a>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-nav="record" role="tab">Grabar</button>
+      <button class="tab" data-nav="library" role="tab">Biblioteca <span id="libCount" class="count"></span></button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ───────── GRABAR ───────── -->
+    <section id="view-record" class="view active">
+      <div class="hero">
+        <h1>GRABA. EXPLICA. COMPARTE.</h1>
+        <p>Pantalla, cámara y voz en un solo vídeo. Todo se guarda en tu dispositivo: sin cuentas, sin subidas, sin límite de tiempo.</p>
+      </div>
+
+      <div class="setup">
+        <div class="card">
+          <h2 class="card-title">Modo de grabación</h2>
+          <div class="modes" role="radiogroup">
+            <label class="mode" data-needs="screen">
+              <input type="radio" name="mode" value="screen-cam">
+              <span class="mode-ico" aria-hidden="true">
+                <svg viewBox="0 0 48 48"><rect x="4" y="8" width="40" height="26" rx="2"/><path d="M16 42h16M24 34v8"/><circle cx="36" cy="28" r="7" class="fill"/></svg>
+              </span>
+              <span class="mode-txt"><b>Pantalla + cámara</b><small>Burbuja flotante con tu cara</small></span>
+            </label>
+            <label class="mode" data-needs="screen">
+              <input type="radio" name="mode" value="screen">
+              <span class="mode-ico" aria-hidden="true">
+                <svg viewBox="0 0 48 48"><rect x="4" y="8" width="40" height="26" rx="2"/><path d="M16 42h16M24 34v8"/></svg>
+              </span>
+              <span class="mode-txt"><b>Solo pantalla</b><small>Pantalla, ventana o pestaña</small></span>
+            </label>
+            <label class="mode">
+              <input type="radio" name="mode" value="cam">
+              <span class="mode-ico" aria-hidden="true">
+                <svg viewBox="0 0 48 48"><rect x="4" y="12" width="28" height="24" rx="2"/><path d="M32 20l12-6v20l-12-6z"/></svg>
+              </span>
+              <span class="mode-txt"><b>Solo cámara</b><small>Vídeo selfie o cámara trasera</small></span>
+            </label>
+          </div>
+          <p id="noScreenNote" class="note" hidden>
+            Este navegador no permite capturar la pantalla desde una web (ocurre en Chrome para Android e iOS).
+            Usa <b>Solo cámara</b> aquí, o el grabador de pantalla nativo de Android (panel de ajustes rápidos → «Grabar pantalla») e importa el vídeo a tu biblioteca.
+          </p>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Ajustes</h2>
+          <div class="field" id="fieldCam">
+            <label for="camSelect">Cámara</label>
+            <div class="row">
+              <select id="camSelect"><option value="">Cámara predeterminada</option></select>
+              <button class="btn ghost sm" id="flipBtn" type="button" title="Cambiar cámara frontal/trasera">Girar</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="micSelect">Micrófono</label>
+            <select id="micSelect">
+              <option value="default">Micrófono predeterminado</option>
+              <option value="off">Sin micrófono</option>
+            </select>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <label for="quality">Calidad</label>
+              <select id="quality">
+                <option value="720">HD 720p</option>
+                <option value="1080" selected>Full HD 1080p</option>
+                <option value="1440">QHD 1440p</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="format">Formato</label>
+              <select id="format"></select>
+            </div>
+          </div>
+          <label class="switch" id="sysAudioRow">
+            <input type="checkbox" id="sysAudio" checked>
+            <span class="slider"></span>
+            <span>Audio del sistema / pestaña</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="countdown" checked>
+            <span class="slider"></span>
+            <span>Cuenta atrás de 3 segundos</span>
+          </label>
+        </div>
+
+        <div class="card preview-card">
+          <h2 class="card-title">Vista previa de cámara</h2>
+          <div class="cam-preview" id="camPreviewWrap">
+            <video id="camPreview" playsinline muted autoplay></video>
+            <div class="cam-off" id="camOff">
+              <button class="btn ghost" id="camTestBtn" type="button">Probar cámara</button>
+            </div>
+          </div>
+          <div class="meter" aria-hidden="true"><div id="micLevel"></div></div>
+        </div>
+      </div>
+
+      <div class="start-wrap">
+        <button class="btn primary xl" id="startBtn" type="button">
+          <span class="rec-dot"></span> EMPEZAR GRABACIÓN
+        </button>
+        <label class="btn ghost" for="importInput">Importar vídeo</label>
+        <input type="file" id="importInput" accept="video/*" hidden multiple>
+      </div>
+    </section>
+
+    <!-- ───────── GRABANDO ───────── -->
+    <section id="view-recording" class="view">
+      <div class="live">
+        <div class="live-stage">
+          <video id="liveVideo" playsinline muted autoplay></video>
+          <div class="live-badge"><span class="rec-dot blink"></span> <span id="liveState">GRABANDO</span></div>
+        </div>
+        <div class="controls">
+          <span class="timer" id="timer">00:00</span>
+          <button class="ctrl" id="pauseBtn" type="button" title="Pausar / reanudar (P)">
+            <svg viewBox="0 0 24 24"><path d="M7 5h3v14H7zM14 5h3v14h-3z"/></svg><span>Pausa</span>
+          </button>
+          <button class="ctrl stop" id="stopBtn" type="button" title="Terminar (S)">
+            <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg><span>Terminar</span>
+          </button>
+          <button class="ctrl" id="restartBtn" type="button" title="Reiniciar">
+            <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>Reiniciar</span>
+          </button>
+          <button class="ctrl danger" id="discardBtn" type="button" title="Descartar">
+            <svg viewBox="0 0 24 24"><path d="M6 7h12M9 7V4h6v3M8 7l1 13h6l1-13" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>Descartar</span>
+          </button>
+          <button class="ctrl" id="bubbleBtn" type="button" title="Mostrar burbuja de cámara flotante" hidden>
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>Burbuja</span>
+          </button>
+        </div>
+        <p class="hint" id="liveHint"></p>
+      </div>
+    </section>
+
+    <!-- ───────── REVISAR ───────── -->
+    <section id="view-review" class="view">
+      <div class="review">
+        <div class="player-wrap">
+          <video id="player" controls playsinline></video>
+        </div>
+        <aside class="review-side">
+          <input id="titleInput" class="title-input" type="text" maxlength="120" aria-label="Título del vídeo">
+          <p class="meta" id="reviewMeta"></p>
+          <div class="actions">
+            <button class="btn primary" id="shareBtn" type="button">Compartir</button>
+            <button class="btn" id="downloadBtn" type="button">Descargar</button>
+          </div>
+          <div class="speed">
+            <span>Velocidad</span>
+            <div class="chips" id="speedChips">
+              <button data-rate="1" class="on">1×</button><button data-rate="1.25">1,25×</button><button data-rate="1.5">1,5×</button><button data-rate="2">2×</button>
+            </div>
+          </div>
+          <details class="trim" id="trimBox">
+            <summary>Recortar vídeo</summary>
+            <div class="trim-body">
+              <div class="trim-row"><label for="trimStart">Inicio</label><input type="range" id="trimStart" min="0" step="0.1" value="0"><output id="trimStartOut">0:00</output></div>
+              <div class="trim-row"><label for="trimEnd">Fin</label><input type="range" id="trimEnd" min="0" step="0.1" value="0"><output id="trimEndOut">0:00</output></div>
+              <div class="row">
+                <button class="btn ghost sm" id="setStartBtn" type="button">Inicio aquí</button>
+                <button class="btn ghost sm" id="setEndBtn" type="button">Fin aquí</button>
+              </div>
+              <button class="btn" id="trimBtn" type="button">Crear copia recortada</button>
+              <p class="note small">El recorte se procesa en tiempo real: el fragmento se reproduce mientras se exporta. Se guarda como una copia nueva.</p>
+            </div>
+          </details>
+          <div class="actions bottom">
+            <button class="btn ghost" id="newRecBtn" type="button">Nueva grabación</button>
+            <button class="btn ghost danger" id="deleteBtn" type="button">Eliminar</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ───────── BIBLIOTECA ───────── -->
+    <section id="view-library" class="view">
+      <div class="lib-head">
+        <h1>BIBLIOTECA</h1>
+        <input type="search" id="libSearch" placeholder="Buscar por título…" aria-label="Buscar">
+      </div>
+      <p class="note" id="storageInfo"></p>
+      <div class="grid" id="libGrid"></div>
+      <div class="empty" id="libEmpty" hidden>
+        <p>Aún no hay grabaciones.</p>
+        <button class="btn primary" data-nav="record" type="button">Grabar la primera</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="countdown" id="countdown" hidden><span id="countNum">3</span></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="busy" id="busy" hidden><div class="busy-box"><div class="spinner"></div><p id="busyText">Procesando…</p><div class="bar"><div id="busyBar"></div></div><button class="btn ghost sm" id="busyCancel" type="button" hidden>Cancelar</button></div></div>
+
+  <footer class="foot">© <span id="year"></span> Ballixart · <a href="https://ballixart.es" target="_blank" rel="noopener">ballixart.es</a></footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
