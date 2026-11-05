@@ -24,8 +24,8 @@ const LGDAYS=['Lu','Ma','Mi','Ju','Vi','Sá','Do'];
 const LG={run:true,speed:1,t:0,clock:8*3600,I:{},AI:{AI1:5,AI2:20},out:{},st:{},Q:{},blind:0,blindFault:false,sel:null,wire:null,drag:null,sig:'',ex:null,tm:null};
 function lgNew(){const ins={},q={};for(let i=1;i<=8;i++)ins['I'+i]={n:['Pulsador 1','Pulsador 2','Interruptor 3','Sensor de puerta','Llave de armado','Entrada 6','Entrada 7','Entrada 8'][i-1],t:i<=2?'push':'sw'};
   const qt=['lamp','lamp','blind_up','blind_down','heater','pump','siren','lock'],qn=['Luz 1','Luz 2','Persiana subir','Persiana bajar','Calefacción','Riego','Sirena','Cerradura'];for(let i=1;i<=8;i++)q['Q'+i]={n:qn[i-1],t:qt[i-1],kw:[0.1,0.1,0.25,0.25,1.5,0.4,0.1,0.02][i-1]};
-  return{ins,ai:{AI1:{n:'Luz exterior',min:0,max:10,u:'V'},AI2:{n:'Temperatura',min:0,max:40,u:'°C'}},q,blocks:[],qin:{},nid:1}}
-const lgProg=()=>{const p=P();if(!p.logo)p.logo=lgNew();return p.logo};
+  return{link:{},ins,ai:{AI1:{n:'Luz exterior',min:0,max:10,u:'V'},AI2:{n:'Temperatura',min:0,max:40,u:'°C'}},q,blocks:[],qin:{},nid:1}}
+const lgProg=()=>{const p=P();if(!p.logo)p.logo=lgNew();if(!p.logo.link)p.logo.link={};return p.logo};
 const hm=s=>{const [h,m]=String(s).split(':').map(Number);return (h||0)*60+(m||0)};
 function lgVal(r){if(!r)return null;if(r==='hi')return 1;if(r==='lo')return 0;if(/^I\d/.test(r))return LG.I[r]?1:0;if(/^AI/.test(r))return LG.AI[r];return LG.out[r]||0}
 function lgEval(g,dt){LG.t+=dt;LG.clock=(LG.clock+dt)%(7*86400);
@@ -81,7 +81,7 @@ function vLogo(){
   const ex=Object.entries(LGEX).map(([k,e])=>`<option value="${k}" ${g.ex===k?'selected':''}>${e.n}</option>`).join('');
   return`<div class="bar noprint"><select onchange="if(this.value)lgLoad(this.value)"><option value="">Cargar programa de ejemplo…</option>${ex}</select><button class="b s" onclick="if(confirm('¿Borrar el programa?')){P().logo=lgNew();LG.st={};LG.out={};render()}">Borrar programa</button>
    <button class="b ${LG.run?'':'d'}" onclick="LG.run=!LG.run;render()">${LG.run?'⏸ Pausar':'▶ Ejecutar'}</button><label style="margin:0">Velocidad</label><select onchange="LG.speed=+this.value;render()">${[1,5,30,120,600].map(v=>`<option value="${v}" ${LG.speed===v?'selected':''}>×${v}</option>`).join('')}</select>
-   <span class="muted">Autómata programable tipo LOGO!: programa el esquema de funciones y pruébalo en directo.</span></div>
+   <button class="b" style="background:#6a1b9a" onclick="lgHouseDemo()">🏠 Demo: casa domotizada</button><span class="muted">Autómata programable tipo LOGO!: programa el esquema de funciones y pruébalo en directo.</span></div>
   <div class="card noprint" style="padding:8px"><div style="font-weight:600;margin-bottom:4px">Bloques (toca para añadir)</div><div style="display:flex;flex-wrap:wrap;gap:5px">${pal}</div></div>
   <div class="gc"><div class="card m-center" style="padding:6px;align-self:start"><div style="overflow:auto;max-height:86vh;border:1px solid var(--bd);border-radius:6px"><svg id="lg-svg" viewBox="0 0 1000 640" style="width:100%;min-width:760px;height:auto;background:#fff;touch-action:none;display:block"><g id="lg-g"></g></svg></div>
     <p class="muted" style="font-size:12.5px;margin:6px 4px 0">Para unir: toca el <b>círculo de salida</b> (derecha de una entrada I, un bloque o un valor fijo) y después el <b>círculo de entrada</b> de otro bloque o de Q. Toca una conexión ya hecha para quitarla. Verde = señal activa.</p></div>
@@ -117,6 +117,11 @@ function lgIssues(g){const o=[],used=new Set();g.blocks.forEach(b=>b.in.forEach(
   const dfs=id=>{const b=g.blocks.find(x=>x.id===id);if(!b)return;if(visiting[id]===1){loops.add(id);return}if(visiting[id]===2)return;visiting[id]=1;if(!memo.includes(b.t))b.in.forEach(r=>{if(r&&!/^(I|AI|hi|lo)/.test(r))dfs(r)});visiting[id]=2};
   g.blocks.forEach(b=>dfs(b.id));if(loops.size)o.push({lv:'err',msg:`Lazo sin memoria ni temporizador entre bloques (${[...loops].join(', ')}): la señal oscilaría. Añade un biestable o un retardo.`});
   const maxQ=Math.max(0,...qs.map(q=>+q.slice(1)));if(maxQ>4)o.push({lv:'info',msg:`Usas hasta Q${maxQ}: necesitas ${Math.ceil((maxQ-4)/4)} módulo(s) de ampliación de salidas.`});
+  Object.entries(g.link||{}).forEach(([k,v])=>{if(!v)return;const h=HS(),isI=/^I/.test(k),exists=v.startsWith('item:')?h.items.some(i=>'item:'+i.id===v):h.rooms.some(r=>'lights:'+r.id===v);
+    if(!exists)o.push({lv:'err',msg:`${k} está vinculada a un elemento de la casa que ya no existe.`});
+    else if(!isI&&!g.qin[k])o.push({lv:'warn',msg:`${k} gobierna un elemento de la casa, pero no tiene ninguna señal conectada en el programa: nunca se activará.`});
+    else if(isI&&!used.has(k))o.push({lv:'info',msg:`${k} está vinculada al plano, pero el programa no la usa.`});
+    if(!isI&&v.startsWith('item:')){const it=h.items.find(i=>'item:'+i.id===v);if(it&&HI[it.k].sw)o.push({lv:'warn',msg:`${k} vinculada a un mando: las salidas deben gobernar luces o aparatos.`})}});
   if(LG.blindFault)o.push({lv:'err',msg:'EN DIRECTO: subir y bajar activos a la vez en la persiana. ¡Motor en riesgo!'});
   return o}
 function lgPanel(){const g=lgProg(),on=n=>LG.I['I'+n],q=n=>LG.Q['Q'+n];
@@ -143,8 +148,8 @@ function lgScene(g){const tile=(n,x,y)=>{const d=g.q['Q'+n],v=!!LG.Q['Q'+n],t=d.
   return`<g transform="translate(${x} ${y})"><rect width="90" height="96" rx="8" fill="#fafbfc" stroke="${c}" stroke-width="${v?3:1.5}"/>${ic}<text x="45" y="90" text-anchor="middle" font-size="11" font-weight="700" fill="#334">Q${n} ${esc(d.n).slice(0,12)}</text></g>`};
   return`<svg viewBox="0 0 380 200" style="width:100%;max-width:420px"><defs><radialGradient id="lgg"><stop offset="0" stop-color="#ffe680" stop-opacity=".9"/><stop offset="1" stop-color="#ffe680" stop-opacity="0"/></radialGradient></defs>${[1,2,3,4,5,6,7,8].map(n=>tile(n,(n-1)%4*95,Math.floor((n-1)/4)*100)).join('')}</svg>`}
 function lgInspector(g){const s=LG.sel;if(!s)return'<div class="card muted">Toca un bloque, una entrada o una salida del esquema para editarlo.</div>';
-  if(/^I\d/.test(s)){const d=g.ins[s];return`<div class="card"><h3>Entrada ${s}</h3><label>Nombre</label><input value="${esc(d.n)}" style="width:100%" onchange="lgProg().ins['${s}'].n=this.value;render()"><label>Tipo</label><select onchange="lgProg().ins['${s}'].t=this.value;render()"><option value="push" ${d.t==='push'?'selected':''}>Pulsador (mientras se mantiene)</option><option value="sw" ${d.t==='sw'?'selected':''}>Interruptor (queda fijo)</option></select></div>`}
-  if(/^Q\d/.test(s)){const d=g.q[s];return`<div class="card"><h3>Salida ${s}</h3><label>Nombre</label><input value="${esc(d.n)}" style="width:100%" onchange="lgProg().q['${s}'].n=this.value;render()"><label>Dispositivo</label><select style="width:100%" onchange="lgProg().q['${s}'].t=this.value;render()">${Object.entries(LGQT).map(([k,v])=>`<option value="${k}" ${d.t===k?'selected':''}>${v}</option>`).join('')}</select><label>Potencia de la carga (kW)</label><input type="number" step="0.05" value="${d.kw}" onchange="lgProg().q['${s}'].kw=num(this.value);render()"></div>`}
+  if(/^I\d/.test(s)){const d=g.ins[s];return`<div class="card"><h3>Entrada ${s}</h3><label>Nombre</label><input value="${esc(d.n)}" style="width:100%" onchange="lgProg().ins['${s}'].n=this.value;render()"><label>Tipo</label><select onchange="lgProg().ins['${s}'].t=this.value;render()"><option value="push" ${d.t==='push'?'selected':''}>Pulsador (mientras se mantiene)</option><option value="sw" ${d.t==='sw'?'selected':''}>Interruptor (queda fijo)</option></select>${lgLinkSel(s)}</div>`}
+  if(/^Q\d/.test(s)){const d=g.q[s];return`<div class="card"><h3>Salida ${s}</h3><label>Nombre</label><input value="${esc(d.n)}" style="width:100%" onchange="lgProg().q['${s}'].n=this.value;render()"><label>Dispositivo</label><select style="width:100%" onchange="lgProg().q['${s}'].t=this.value;render()">${Object.entries(LGQT).map(([k,v])=>`<option value="${k}" ${d.t===k?'selected':''}>${v}</option>`).join('')}</select><label>Potencia de la carga (kW)</label><input type="number" step="0.05" value="${d.kw}" onchange="lgProg().q['${s}'].kw=num(this.value);render()">${lgLinkSel(s)}</div>`}
   const b=g.blocks.find(x=>x.id===s);if(!b)return'';const def=LGT[b.t],p=b.p;let f='';
   if('T' in p)f+=`<label>Tiempo T (s)</label><input type="number" min="0.1" step="0.5" value="${p.T}" onchange="lgSetP('${b.id}','T',num(this.value,1))">`;
   if(b.t==='flash')f+=`<label>Tiempo activa (s)</label><input type="number" step="0.1" value="${p.ton}" onchange="lgSetP('${b.id}','ton',num(this.value,0.5))"><label>Tiempo inactiva (s)</label><input type="number" step="0.1" value="${p.toff}" onchange="lgSetP('${b.id}','toff',num(this.value,0.5))">`;
@@ -232,3 +237,30 @@ function lgCheck(){const g=lgProg(),res=[],used=new Set();g.blocks.forEach(b=>b.
   else if(upD.length&&dnD.length)res.push({lv:'ok',msg:'Persiana: con ninguna combinación se activan subir y bajar a la vez (enclavamiento correcto).'});
   return res}
 window.lgDoCheck=()=>{LG.check=lgCheck();render()};
+
+// ---------- vínculo con la casa ----------
+const LGIN_K=['interruptor','conmutador','cruzamiento','pulsador','regulador','detector','sensor','timbre'];
+const LGOUT_K=['luz','foco','radiador','split_i','termo','suelo','extractor','toma_horno','toma_lav','toma_lvj','toma_sec'];
+function lgOutOf(it){const g=P().logo;if(!g||!g.link)return null;for(const q of Object.keys(g.link)){if(!/^Q\d/.test(q))continue;const v=g.link[q];if(!v)continue;
+  if(v==='item:'+it.id)return q;if(v.startsWith('lights:')&&(it.k==='luz'||it.k==='foco')){const r=roomAt(HS(),it.x,it.y);if(r&&r.id===v.slice(7))return q}}return null}
+function lgInOf(it){const g=P().logo;if(!g||!g.link)return null;for(const k of Object.keys(g.link))if(/^I\d/.test(k)&&g.link[k]==='item:'+it.id)return k;return null}
+const lgHasLinks=()=>{const g=P().logo;return !!(g&&g.link&&Object.values(g.link).some(Boolean))};
+function lgFromHouse(it){const k=lgInOf(it);if(!k)return;const d=lgProg().ins[k];
+  if(it.k==='pulsador'||it.k==='timbre'||(d&&d.t==='push')){LG.I[k]=true;setTimeout(()=>{LG.I[k]=false},450)}else LG.I[k]=!!SIMH.sw[it.id]}
+function lgHouseStep(dt){if(!lgHasLinks()||!LG.run||document.getElementById('lg-svg'))return;lgStep(dt*LG.speed)}
+function lgLinkOptions(k){const h=HS();if(/^I\d/.test(k))return h.items.filter(i=>LGIN_K.includes(i.k)).map(i=>[`item:${i.id}`,`${HI[i.k].n} · ${(roomAt(h,i.x,i.y)||{name:'fuera'}).name}`]);
+  const o=[];h.rooms.forEach(r=>{if(h.items.some(i=>(i.k==='luz'||i.k==='foco')&&roomAt(h,i.x,i.y)===r))o.push([`lights:${r.id}`,`Todas las luces de ${r.name||RT[r.type]}`])});
+  h.items.filter(i=>LGOUT_K.includes(i.k)).forEach(i=>o.push([`item:${i.id}`,`${HI[i.k].n} · ${(roomAt(h,i.x,i.y)||{name:'fuera'}).name}`]));return o}
+window.lgSetLink=(k,v)=>{const g=lgProg();if(v)g.link[k]=v;else delete g.link[k];save();render()};
+function lgLinkSel(k){const g=lgProg(),cur=g.link[k]||'',opts=lgLinkOptions(k);
+  return`<label>Vinculado a la casa</label><select style="width:100%" onchange="lgSetLink('${k}',this.value)"><option value="">— sin vincular —</option>${opts.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${esc(l)}</option>`).join('')}</select><p class="muted" style="font-size:12px;margin:2px 0 0">${/^I/.test(k)?'Al pulsarlo en el plano de la casa, el autómata recibe esta entrada.':'La salida del autómata gobierna este elemento de la casa.'}</p>`}
+window.lgHouseDemo=()=>{const h=HS();if(!h.rooms.length)return alert('Carga antes una plantilla de casa en la pestaña «Casa (plano)».');
+  const room=t=>h.rooms.find(r=>r.type===t&&h.items.some(i=>(i.k==='luz')&&roomAt(h,i.x,i.y)===r)),sal=room('salon')||h.rooms.find(r=>h.items.some(i=>i.k==='luz'&&roomAt(h,i.x,i.y)===r)),pas=room('pasillo')||h.rooms.filter(r=>h.items.some(i=>i.k==='luz'&&roomAt(h,i.x,i.y)===r))[1]||sal,ves=h.rooms.find(r=>r.type==='vestibulo')||sal;
+  const mk=(k,r)=>{let it=h.items.find(i=>i.k===k&&roomAt(h,i.x,i.y)===r&&!Object.values((P().logo&&P().logo.link)||{}).includes('item:'+i.id));if(!it){const p=freeSpot(h,r,k);it={id:uid(),k,x:p.x,y:p.y};h.items.push(it)}return it};
+  const b1=mk('pulsador',sal),b2=mk('pulsador',ves),b3=mk('pulsador',pas);
+  const g=lgNew();g.ins.I1.n='Pulsador del salón';g.ins.I2.n='Apagar todo (entrada)';g.ins.I3.n='Pulsador del pasillo';g.q.Q1.n='Luces del salón';g.q.Q2.n='Luces del pasillo';
+  g.blocks=[{id:'B1',t:'toggle',x:200,y:60,in:['I1','I2'],p:{}},{id:'B2',t:'tof',x:200,y:200,in:['I3'],p:{T:15}},{id:'B3',t:'not',x:380,y:200,in:['I2'],p:{}},{id:'B4',t:'and',x:540,y:200,in:['B2','B3',null],p:{}}];g.qin={Q1:'B1',Q2:'B4'};g.nid=5;g.ex=null;
+  g.link={I1:'item:'+b1.id,I2:'item:'+b2.id,I3:'item:'+b3.id,Q1:'lights:'+sal.id,Q2:'lights:'+pas.id};P().logo=g;LG.st={};LG.out={};LG.I={};LG.Q={};LG.run=true;LG.speed=1;
+  hsInit();CS.sim=true;tab='casa';
+  SIMH.ex={t:'Casa domotizada con autómata',s:[`1. Los tres pulsadores del plano (${sal.name}, ${ves.name}, ${pas.name}) ya no encienden la luz directamente: son entradas I1, I2 e I3 del autómata.`,`2. Pulsa el del ${sal.name}: el telerruptor del autómata enciende las luces del salón (Q1). Púlsalo otra vez y se apagan.`,`3. Pulsa el del ${pas.name}: la luz del pasillo (Q2) se enciende y se apaga sola a los 15 s.`,`4. Pulsa «Apagar todo» (${ves.name}): apaga el salón y el pasillo. Mira las señales I y Q en el panel del autómata.`,'5. Cambia el cableado en la pestaña «Domótica (autómata)» y la casa responde al instante.']};
+  hsAfterEdit();render()};

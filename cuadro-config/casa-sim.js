@@ -23,7 +23,8 @@ function hsLive(code){const m=SIMH.m;if(code==='NC')return false;if(!m||!code)re
   return SIMH.main&&!SIMH.off.iga&&!SIMH.trip.iga&&!SIMH.off['b_'+code]&&!SIMH.trip['b_'+code]&&!(g&&g.diff&&(SIMH.trip['d_'+g.id]||SIMH.off['d_'+g.id]))}
 const CTRL=['interruptor','conmutador','cruzamiento','pulsador','regulador','detector'];
 function roomSwitches(m,r,it){return m.h.items.filter(i=>CTRL.includes(i.k)&&roomAt(m.h,i.x,i.y)===r&&(!m.W||!it||(m.codeOf[i.id]&&famOk(m.codeOf[it.id]||'C1',m.codeOf[i.id]))))}
-function lightOn(m,it){const r=roomAt(m.h,it.x,it.y),sw=r?roomSwitches(m,r,it):[];if(!sw.length)return true;
+function hsRun(it){const q=typeof lgOutOf==='function'?lgOutOf(it):null;return q?!!LG.Q[q]:!!SIMH.run[it.id]}
+function lightOn(m,it){const lq=typeof lgOutOf==='function'?lgOutOf(it):null;if(lq)return !!LG.Q[lq];const r=roomAt(m.h,it.x,it.y),sw=r?roomSwitches(m,r,it):[];if(!sw.length)return true;
   const two=sw.filter(s=>s.k==='conmutador'||s.k==='cruzamiento'),pul=sw.filter(s=>s.k==='pulsador');let on=false;
   if(two.length>=2)on=two.reduce((a,s)=>a^(SIMH.sw[s.id]?1:0),0)===1;else if(two.length===1)on=!!SIMH.sw[two[0].id];
   return on||sw.some(s=>(s.k==='interruptor'||s.k==='regulador'||s.k==='detector')&&SIMH.sw[s.id])||(pul.length>0&&!!SIMH.latch[r.id])}
@@ -33,10 +34,10 @@ function ctrlText(m,r){const sw=roomSwitches(m,r),n=k=>sw.filter(s=>s.k===k).len
 function kwNow(m,it){const k=it.k;
   if(k==='luz'||k==='foco')return lightOn(m,it)?itemKw(it)*brightness(m,it):0;
   if(PLUGGABLE.includes(k))return SIMH.plug[it.id]?PLUGS[SIMH.plug[it.id]].kw:0;
-  if(RUNNABLE.includes(k))return SIMH.run[it.id]?(k==='caldera'?0.1:itemKw(it)):0;return 0}
+  if(RUNNABLE.includes(k))return hsRun(it)?(k==='caldera'?0.1:itemKw(it)):0;return 0}
 function hsCurrents(m){const I={},kw={};m.h.items.forEach(it=>{const code=m.codeOf[it.id];if(!code)return;if(!hsLive(code))return;const k=kwNow(m,it);if(k){kw[code]=(kw[code]||0)+k;I[code]=(I[code]||0)+k*1000/230}});return{I,kw}}
 function hsTrip(k,msg){if(SIMH.trip[k])return;SIMH.trip[k]=true;hsSay('🔴 '+msg,'err')}
-function hsTick(dt){const m=SIMH.m;if(!m)return false;SIMH.t+=dt;let ch=false;const sp=SIMH.speed,cur=hsCurrents(m);SIMH.cur=cur;let tot=0;
+function hsTick(dt){const m=SIMH.m;if(!m)return false;SIMH.t+=dt;if(typeof lgHouseStep==='function')lgHouseStep(dt);let ch=false;const sp=SIMH.speed,cur=hsCurrents(m);SIMH.cur=cur;let tot=0;
   Object.keys(m.H.circ).forEach(code=>{const In=m.H.circ[code].def.In,I=cur.I[code]||0;
     if(!hsLive(code)){SIMH.heat[code]=Math.max(0,(SIMH.heat[code]||0)-dt*0.3);return}tot+=I;
     if(SIMH.short[code]){hsTrip('b_'+code,`Cortocircuito en ${code}: dispara AL INSTANTE el magnetotérmico de ${code}. El resto de circuitos sigue con tensión (selectividad correcta).`);ch=true;return}
@@ -60,13 +61,16 @@ function hsClick(id){const m=SIMH.m;if(!m)return;const it=m.h.items.find(i=>i.id
   else if(k==='timbre'){SIMH.ring[id]=SIMH.t;hsSay('Pulsas el timbre: suena el zumbador (ding-dong). El pulsador cierra un circuito de poca potencia.');try{const A=window.AudioContext||window.webkitAudioContext,c=new A(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(0.15,c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+0.6);o.start();o.stop(c.currentTime+0.6)}catch(e){}}
   else if(PLUGGABLE.includes(k)){const cur=SIMH.plug[id]||'';const nx=PLUGKEYS[(PLUGKEYS.indexOf(cur)+1)%PLUGKEYS.length];SIMH.plug[id]=nx;const p=PLUGS[nx];
     hsSay(p.kw?`Enchufas «${p.n}» (${p.kw} kW) en una toma de ${rn}. Añade ${amps(p.kw)} A al circuito ${code} (máx. ${In} A).`+(hsLive(code)?'':' Pero el circuito está sin tensión.'):'Desenchufas el aparato: el consumo vuelve a bajar.')}
+  else if(k==='sensor'){SIMH.sw[id]=!SIMH.sw[id];hsSay(SIMH.sw[id]?`El sensor de ${rn} detecta actividad.`:`El sensor de ${rn} vuelve a reposo.`)}
+  else if(RUNNABLE.includes(k)&&typeof lgOutOf==='function'&&lgOutOf(it)){hsSay(`${d.n}: lo gobierna el autómata (${lgOutOf(it)}). Actúa sobre sus entradas (pulsadores) para cambiarlo.`)}
   else if(RUNNABLE.includes(k)){SIMH.run[id]=!SIMH.run[id];const kw=itemKw(it);hsSay(`${d.n} ${SIMH.run[id]?'conectado':'apagado'}${SIMH.run[id]&&kw?`: consume ${f1(kw)} kW = ${amps(kw)} A en ${code} (máx. ${In} A)`:''}.`+(SIMH.run[id]&&!hsLive(code)?' Pero el circuito está sin tensión.':''))}
   else if(d.ud||k==='gas_cocina'||k==='gas_calentador'){SIMH.run[id]=!SIMH.run[id];
     if(d.ud){const hotOk=hsHotOk(m);hsSay(`${d.n} ${SIMH.run[id]?'abierto':'cerrado'}${SIMH.run[id]?`: caudal ${d.ud} L/s. `+(d.hot?(hotOk?'Sale agua caliente: el termo/caldera está funcionando.':'El agua sale FRÍA: no hay termo o caldera en marcha. Enciende el termo.'):'Agua fría.'):'.'}`,SIMH.run[id]&&d.hot&&!hotOk?'err':'')}
     else{const r=roomAt(m.h,it.x,it.y),vent=m.h.items.some(i=>i.k==='gas_rejilla'&&roomAt(m.h,i.x,i.y)===r),has=m.h.items.some(i=>i.k==='gas_cont');hsSay(`${d.n} ${SIMH.run[id]?'encendido':'apagado'}.`+(SIMH.run[id]?(!has?' ⚠ No hay llave/contador de gas: sin suministro.':vent?` Consume ${d.kwg} kW de gas. Hay rejilla de ventilación: correcto.`:' ⚠ NO hay rejilla de ventilación en la estancia: riesgo de monóxido de carbono.'):''),SIMH.run[id]&&(!has||!vent)?'err':'')}}
   else if(k==='cuadro'){hsSay('Cuadro general: usa el panel de protecciones para abrir, cerrar o rearmar los aparatos.')}
-  else hsSay(`${d.n}: elemento sin función en la simulación.`)}
-function hsHotOk(m){return m.h.items.some(i=>{if(!SIMH.run[i.id])return false;if(i.k==='termo'||i.k==='aerot')return hsLive(itemCode(m,i));if(i.k==='caldera')return m.h.items.some(g=>g.k==='gas_cont');return i.k==='gas_calentador'})}
+  else hsSay(`${d.n}: elemento sin función en la simulación.`);
+  if(typeof lgFromHouse==='function')lgFromHouse(it)}
+function hsHotOk(m){return m.h.items.some(i=>{if(!hsRun(i))return false;if(i.k==='termo'||i.k==='aerot')return hsLive(itemCode(m,i));if(i.k==='caldera')return m.h.items.some(g=>g.k==='gas_cont');return i.k==='gas_calentador'})}
 function hsBrk(k){if(SIMH.trip[k]){SIMH.trip[k]=false;SIMH.heat[k.replace('b_','')]=0;if(k==='iga')SIMH.heat.iga=0;hsSay('Rearmas '+hsName(k)+'.'+(hsStillFault(k)?' ⚠ El fallo sigue presente: vuelve a saltar.':''))}else{SIMH.off[k]=!SIMH.off[k];hsSay(hsName(k)+(SIMH.off[k]?' abierto: se corta la corriente aguas abajo.':' cerrado.'))}}
 function hsStillFault(k){return k.startsWith('b_')&&SIMH.short[k.slice(2)]||k.startsWith('d_')&&Object.keys(SIMH.leak).some(c=>SIMH.leak[c]&&SIMH.m.gOf[c]&&'d_'+SIMH.m.gOf[c].id===k)}
 function hsName(k){if(k==='iga')return 'el interruptor general (IGA)';if(k.startsWith('b_'))return 'el magnetotérmico '+k.slice(2);const g=SIMH.m.groups.find(x=>'d_'+x.id===k);return g?'el diferencial «'+g.label+'»':k}
@@ -93,7 +97,7 @@ function hsExample(n){const m=SIMH.m;hsInit(true);const M=SIMH.m;const h=M.h,fin
     done('Encender la cocina de gas',['1. Abres el gas: la llama aparece en la cocina.','2. El sistema comprueba la rejilla de ventilación de la estancia: si falta, avisa de riesgo de monóxido de carbono.','3. El consumo de gas se suma a la potencia de la instalación (mira la tubería naranja).','Prueba: borra la rejilla en modo edición y repite el ejemplo.'])}
   hsRefresh(true)}
 // ---------- panel ----------
-function hsStatus(m){const s=[];const lit=m.h.items.filter(i=>(i.k==='luz'||i.k==='foco')&&lightOn(m,i)&&hsLive(itemCode(m,i)||'C1')).length;s.push(`Luces encendidas: <b>${lit}</b>`);
+function hsStatus(m){const s=[];if(typeof lgHasLinks==='function'&&lgHasLinks()){const I=Object.keys(LG.I).filter(k=>LG.I[k]).join(' ')||'—',Q=Object.keys(LG.Q).filter(k=>LG.Q[k]).join(' ')||'—';s.push(`Autómata: entradas activas <b>${I}</b> · salidas activas <b>${Q}</b>${LG.run?'':' (en pausa)'}`)}const lit=m.h.items.filter(i=>(i.k==='luz'||i.k==='foco')&&lightOn(m,i)&&hsLive(itemCode(m,i)||'C1')).length;s.push(`Luces encendidas: <b>${lit}</b>`);
   const pl=Object.keys(SIMH.plug).filter(k=>SIMH.plug[k]).length,rn=Object.keys(SIMH.run).filter(k=>SIMH.run[k]).length;s.push(`Aparatos enchufados: <b>${pl}</b> · en marcha: <b>${rn}</b>`);
   const open=m.h.items.filter(i=>HI[i.k].ud&&SIMH.run[i.id]),Q=open.reduce((a,i)=>a+HI[i.k].ud,0);if(open.length){const e=m.H.cold&&m.H.cold.edges[0],dn=e?e.dn:16,v=4*(Q/1000)/(Math.PI*Math.pow(dn*0.8/1000,2));s.push(`Agua: <b>${Q.toFixed(2)} L/s</b> por tubería Ø${dn} mm → ${v.toFixed(1)} m/s`)}
   const g=m.h.items.filter(i=>HI[i.k].kwg&&SIMH.run[i.id]).reduce((a,i)=>a+HI[i.k].kwg,0);if(g)s.push(`Gas: <b>${g} kW</b> en uso`);
@@ -113,6 +117,7 @@ function hsPanel(){const m=SIMH.m;if(!m)return'';const I=SIMH.cur.I,tot=Object.v
    <div class="bar"><button class="b ${SIMH.main?'':'d'}" onpointerdown="SIMH.main=!SIMH.main;hsSay('Acometida '+(SIMH.main?'conectada.':'cortada: toda la casa sin tensión.'));hsRefresh(true)">Red: ${SIMH.main?'CONECTADA':'CORTADA'}</button><button class="b s" onpointerdown="hsReset()">Reiniciar</button>
    <select onchange="SIMH.speed=num(this.value,5)"><option value="1" ${SIMH.speed===1?'selected':''}>×1</option><option value="5" ${SIMH.speed===5?'selected':''}>×5</option><option value="20" ${SIMH.speed===20?'selected':''}>×20</option></select></div>
    <p class="muted" style="font-size:12px;margin:4px 0">Pulsa en el plano: interruptores (luz), tomas (enchufa aparatos), aparatos, grifos y cocina de gas.</p>
+   <div class="bar"><button class="b" style="background:#6a1b9a" onpointerdown="lgHouseDemo()">🏠 Demo con autómata</button></div>
    <div style="font-weight:600;margin:6px 0 4px">Ejemplos de funcionamiento</div><div class="bar" style="gap:4px">${exs}</div><div class="bar" style="gap:4px">${ex2}</div>
    ${SIMH.ex?`<div class="chk info" style="margin-top:6px"><b>${SIMH.ex.t}</b>${SIMH.ex.s.map(x=>`<div>${esc(x)}</div>`).join('')}</div>`:''}
    ${edit}

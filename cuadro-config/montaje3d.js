@@ -365,7 +365,7 @@ function visuals(t,dt){
     d.userData.led.material.color.setHex(col);
     d.userData.body.material.color.setHex(st.destroyed?0x3a3330:sel?0xbfe8d0:0xd3d9de);
     if(S.fault&&S.fault.id===it.n.id)d.userData.led.scale.setScalar(1+0.6*Math.abs(Math.sin(t*10)))});
-  if(R.hitems&&SIMH.m)R.hitems.forEach(hi=>{const live=hsLive(hi.circ),m=SIMH.m;hi.upd({live,t,dt,run:!!SIMH.run[hi.id],plug:SIMH.plug[hi.id]||'',sw:!!SIMH.sw[hi.id],lit:(hi.k==='luz'||hi.k==='foco')?(live&&lightOn(m,hi.item)):false,br:(hi.k==='luz'||hi.k==='foco')?brightness(m,hi.item):1,latch:!!SIMH.latch[(roomAt(m.h,hi.item.x,hi.item.y)||{}).id],dimv:SIMH.dim[hi.id]||100,ring:SIMH.ring[hi.id]!==undefined&&SIMH.t-SIMH.ring[hi.id]<2,anyTrip:Object.keys(SIMH.trip).some(k=>SIMH.trip[k]),on:SIMH.main,ext:()=>m.h.items.some(i=>i.k==='split_i'&&SIMH.run[i.id]&&hsLive(itemCode(m,i)))})});
+  if(R.hitems&&SIMH.m)R.hitems.forEach(hi=>{const live=hsLive(hi.circ),m=SIMH.m;hi.upd({live,t,dt,run:hsRun(hi.item),plug:SIMH.plug[hi.id]||'',sw:!!SIMH.sw[hi.id],lit:(hi.k==='luz'||hi.k==='foco')?(live&&lightOn(m,hi.item)):false,br:(hi.k==='luz'||hi.k==='foco')?brightness(m,hi.item):1,latch:!!SIMH.latch[(roomAt(m.h,hi.item.x,hi.item.y)||{}).id],dimv:SIMH.dim[hi.id]||100,ring:SIMH.ring[hi.id]!==undefined&&SIMH.t-SIMH.ring[hi.id]<2,anyTrip:Object.keys(SIMH.trip).some(k=>SIMH.trip[k]),on:SIMH.main,ext:()=>m.h.items.some(i=>i.k==='split_i'&&SIMH.run[i.id]&&hsLive(itemCode(m,i)))})});
   R.loads.forEach(l=>{const n=l.it.n,live=!!(fl.live[n.id]&&S.on),st=S.fault&&S.fault.id===n.id?S.fault:null;
     const stall=!!(st&&st.opt&&st.opt.rotor&&live),phase=!!(st&&st.opt&&st.opt.phase&&live),ref=l.it.i.amp||0;
     l.upd({live:live&&!S.burn[n.id],t,dt,n,stall,phase,ratio:ref?(fl.I[n.id]||0)/ref:0});
