@@ -61,9 +61,10 @@ function isElevated(h){const area=h.rooms.filter(r=>r.type!=='terraza').reduce((
 
 // ---------- circuitos, rutas y dimensionado ----------
 function houseCalc(h){
+  const Wc=h.wmode==='manual'?wiringCalc(h):null;
   const cab=h.items.find(i=>i.k==='cuadro')||{x:30,y:30},R={circ:{},elec:[],tel:[],cold:null,hot:null,gas:null,pipes:[],area:0};
   R.area=h.rooms.filter(r=>r.type!=='terraza').reduce((s,r)=>s+r.w*r.h/10000,0);R.elev=isElevated(h);
-  const used={};h.items.forEach(it=>{const d=HI[it.k];if(!d||!d.circ)return;const code=it.circ||d.circ;(used[code]=used[code]||[]).push(it)});
+  const used={};h.items.forEach(it=>{const d=HI[it.k];if(!d||!d.circ)return;const code=Wc?(Wc.code[it.id]||null):(it.circ||d.circ);if(!code||!CIRC[code])return;(used[code]=used[code]||[]).push(it)});
   // desbordamiento a circuitos adicionales
   Object.keys(CIRC).forEach(c=>{const def=CIRC[c];if(def.maxPts&&def.extra&&used[c]&&used[c].length>def.maxPts){const sorted=used[c].slice().sort((a,b)=>(a.x+a.y*3)-(b.x+b.y*3));used[c]=sorted.slice(0,def.maxPts);used[def.extra]=(used[def.extra]||[]).concat(sorted.slice(def.maxPts))}});
   if(h.items.some(i=>i.k==='dom'))used.C11=(used.C11||[]).concat(h.items.filter(i=>i.k==='dom'));
@@ -74,7 +75,7 @@ function houseCalc(h){
     // el cableado incluye los mecanismos de maniobra del circuito de alumbrado
     let wire=pts.slice();if(code==='C1'||code==='C6'){const rooms=new Set(pts.map(p=>(roomAt(h,p.x,p.y)||{}).id));h.items.filter(i=>HI[i.k]&&HI[i.k].sw&&rooms.has((roomAt(h,i.x,i.y)||{}).id)).forEach(i=>wire.push(i))}
     const ch=chainFrom(cab,wire);let drops=0;wire.forEach(i=>{drops+=Math.max(0,(250-((HI[i.k]||{}).hz||30)))});
-    const totalCm=ch.total+drops,maxCm=ch.order.length?Math.max(...ch.order.map(o=>o.cum))+200:0;
+    let totalCm=ch.total+drops,maxCm=ch.order.length?Math.max(...ch.order.map(o=>o.cum))+200:0;if(Wc){totalCm=(Wc.len[code]||0)+drops;maxCm=Math.max(0,...pts.map(i=>Wc.cum[i.id]||0))+200}
     R.circ[code]={code,def,items:pts,pts:pts.length,kw,raw,lenM:Math.round(maxCm/100*1.1*10)/10,totM:Math.round(totalCm/100*1.1*10)/10,order:ch.order,segs:ch.order.map(o=>({a:o.a,b:{x:o.p.x,y:o.p.y},it:o.p}))}});
   // telecomunicaciones: topología en estrella desde el router (o el cuadro)
   const router=h.items.find(i=>i.k==='router')||cab;
@@ -157,7 +158,7 @@ function houseIssues(h,C){
     if(i.k==='gas_cocina'&&r&&!h.items.some(x=>x.k==='gas_rejilla'&&roomAt(h,x.x,x.y)===r))bad('err','gas',i.id,'Cocina de gas sin rejilla de ventilación en la estancia.');
     if(['caldera','gas_calentador'].includes(i.k)&&!has('gas_humos'))bad('err','gas',i.id,`${nm(i)} sin salida de humos.`)});
   if(C.gas){if(C.gas.farM>25)bad('warn','gas',null,`Tubería de gas de ${C.gas.farM} m hasta el aparato más lejano: revisa el diámetro y las pérdidas.`);bad('info','gas',null,`Gas: ${C.gas.kw} kW instalados, Ø ${C.gas.edges.map(e=>e.dn).filter((v,i,a)=>a.indexOf(v)===i).join('/')} mm de cobre. Requiere instalador autorizado y prueba de estanqueidad (UNE 60670).`)}
-  return out}
+  return out.concat(wiringIssues(h))}
 
 // ---------- generación del cuadro desde la casa ----------
 function genBoard(b,h){
@@ -228,3 +229,44 @@ function houseBOM(h){const rows=[];if(!h||!h.items.length)return rows;const C=ho
   Object.values(pm).forEach(x=>rows.push({p:{id:'h_pipe'+x.t+x.dn,kind:'house',name:`Vivienda · Tubería ${{cold:'agua fría',hot:'agua caliente',gas:'gas'}[x.t]} Ø${x.dn} (m)`,price:x.t==='gas'?7:0.9+0.06*x.dn},qty:Math.ceil(x.m)}));
   const tel=C.tel.reduce((s,t)=>s+t.m,0);if(tel)rows.push({p:{id:'h_tel',kind:'house',name:'Vivienda · Cable de datos / coaxial (m)',price:0.7},qty:Math.ceil(tel)});
   return rows}
+
+// ---------- conexionado manual: cables dibujados por el usuario ----------
+const needsWire=i=>{const d=HI[i.k];return !!d&&((d.cat==='ele'&&i.k!=='cuadro')||!!d.circ)};
+const FAM={C1:['C1','C6'],C6:['C1','C6'],C2:['C2','C7'],C7:['C2','C7'],C5:['C5','C12'],C12:['C5','C12']};
+const famOk=(want,got)=>want===got||(FAM[want]||[want]).includes(got);
+function wiringCalc(h){const links=h.links||[],cab=h.items.find(i=>i.k==='cuadro'),R={code:{},conf:{},cum:{},len:{},adj:{},link:{}};const by={};h.items.forEach(i=>by[i.id]=i);
+  links.forEach(l=>{if(!by[l.a]||!by[l.b])return;(R.adj[l.a]=R.adj[l.a]||[]).push(l);(R.adj[l.b]=R.adj[l.b]||[]).push(l)});
+  if(cab)(R.adj[cab.id]||[]).forEach(l0=>{const code=l0.code||'C1',start=l0.a===cab.id?l0.b:l0.a,q=[{id:start,cum:manh(cab,by[start])}],seen=new Set([cab.id]);R.link[l0.id]=code;
+    while(q.length){const {id,cum}=q.shift();if(seen.has(id))continue;seen.add(id);
+      if(R.code[id]&&R.code[id]!==code)R.conf[id]=[R.code[id],code];else{R.code[id]=code;R.cum[id]=Math.min(R.cum[id]||1e9,cum)}
+      (R.adj[id]||[]).forEach(l=>{const o=l.a===id?l.b:l.a;if(o===cab.id||seen.has(o))return;R.link[l.id]=code;const d=manh(by[id],by[o]);R.len[code]=(R.len[code]||0)+(seen.size<=1e6?d:0);q.push({id:o,cum:cum+d})})}
+    R.len[code]=(R.len[code]||0)+manh(cab,by[start])});
+  return R}
+function wiringIssues(h){const out=[];if(h.wmode!=='manual')return out;const bad=(lv,tag,id,msg)=>out.push({lv,cat:'ele',tag,id:id||null,msg});
+  const W=wiringCalc(h),cab=h.items.find(i=>i.k==='cuadro'),by={};h.items.forEach(i=>by[i.id]=i);const nm=i=>HI[i.k].n;
+  if(cab&&!(W.adj[cab.id]||[]).length)bad('err','cable',cab.id,'El cuadro no tiene ningún cable de salida: ningún elemento recibe corriente.');
+  const unw=[],conf={};
+  h.items.filter(needsWire).forEach(i=>{const d=HI[i.k],code=W.code[i.id];
+    if(!code){unw.push(i);return}
+    if(W.conf[i.id]){const k=W.conf[i.id].slice().sort().join(' y ');(conf[k]=conf[k]||[]).push(i)}
+    if(d.circ&&!famOk(d.circ,code)&&!W.conf[i.id])bad('err','circuito',i.id,`${nm(i)}: va en ${code} pero debe ir en ${d.circ} (${CIRC[d.circ].n}).`);
+    if(d.sw&&!famOk('C1',code)&&!W.conf[i.id])bad('err','circuito',i.id,`${nm(i)}: un mando de luz no puede ir en ${code}; debe estar en el circuito de alumbrado.`)});
+  if(unw.length<=3)unw.forEach(i=>{const r=roomAt(h,i.x,i.y);bad('err','cable',i.id,`${nm(i)}${r?' de '+(r.name||RT[r.type]):''}: sin cable, no está conectado al cuadro. No funcionará.`)});
+  else{const byRoom={};unw.forEach(i=>{const r=roomAt(h,i.x,i.y),k=r?(r.name||RT[r.type]):'fuera';byRoom[k]=(byRoom[k]||0)+1});bad('err','cable',unw[0].id,`${unw.length} elementos sin cable (no funcionan): ${Object.entries(byRoom).map(([k,n])=>k+' '+n).join(', ')}. Dibuja el cable desde el cuadro o usa «Cablear automáticamente».`)}
+  Object.entries(conf).forEach(([k,l])=>bad('err','circuito',l[0].id,`${l.length} elemento${l.length>1?'s':''} conectado${l.length>1?'s':''} a dos circuitos a la vez (${k}): hay un cable que puentea los dos circuitos. Revisa el cable que une una zona de cada uno.`));
+  h.rooms.forEach(r=>{const inR=i=>roomAt(h,i.x,i.y)===r,lights=h.items.filter(i=>(i.k==='luz'||i.k==='foco')&&inR(i)&&W.code[i.id]),sw=h.items.filter(i=>HI[i.k].sw&&inR(i)&&W.code[i.id]);
+    lights.forEach(l=>{if(!sw.some(s=>famOk(W.code[l.id],W.code[s.id])))bad('warn','mando',l.id,`${r.name||RT[r.type]}: la luz no tiene ningún mando en su circuito (quedará siempre encendida).`)});
+    sw.forEach(s=>{if(!lights.some(l=>famOk(W.code[l.id],W.code[s.id])))bad('warn','mando',s.id,`${nm(s)} de ${r.name||RT[r.type]}: no hay ninguna luz conectada en su mismo circuito.`)});
+    const two=sw.filter(s=>s.k==='conmutador'||s.k==='cruzamiento');if(two.length>=2&&!(h.links||[]).some(l=>two.some(t=>t.id===l.a)&&two.some(t=>t.id===l.b)&&l.a!==l.b))bad('warn','mando',two[0].id,`${r.name||RT[r.type]}: los conmutadores no están unidos entre sí por cable (faltan los viajeros).`)});
+  // lazos
+  const seen=new Set(),inLoop=new Set();const dfs=(id,from)=>{seen.add(id);(W.adj[id]||[]).forEach(l=>{const o=l.a===id?l.b:l.a;if(cab&&o===cab.id)return;if(o===from&&!(W.adj[id]||[]).some(x=>x!==l&&(x.a===o||x.b===o)))return;if(seen.has(o)){if(o!==from)inLoop.add(o)}else dfs(o,id)})};
+  h.items.forEach(i=>{if(!seen.has(i.id)&&W.code[i.id])dfs(i.id,null)});if(inLoop.size)bad('warn','cable',[...inLoop][0],'El cableado forma un lazo cerrado: revisa que no haya cables de más.');
+  (h.links||[]).forEach(l=>{const a=by[l.a],b=by[l.b];if(!a||!b)return;const code=W.link[l.id]||l.code,len=manh(a,b);
+    if(len>2500)bad('warn','cable',l.a,`Cable muy largo (${(len/100).toFixed(0)} m) entre ${nm(a)} y ${nm(b)}.`);
+    if(l.sec&&code&&CIRC[code]&&l.sec<CIRC[code].sec)bad('err','cable',l.a,`Cable de ${l.sec} mm² en ${code}: la sección mínima es ${CIRC[code].sec} mm².`);
+    if(l.pe===false&&(a.k.startsWith('toma')||b.k.startsWith('toma')||HI[a.k].circ&&HI[a.k].kw||HI[b.k].circ&&HI[b.k].kw))bad('err','cable',l.a,`Cable sin conductor de protección (tierra) hacia ${nm(a.k.startsWith('toma')?a:b)}: peligro de electrocución.`)});
+  return out}
+function autoWire(h){const prev=h.wmode;h.wmode='auto';const C=houseCalc(h);h.wmode=prev||'manual';const cab=h.items.find(i=>i.k==='cuadro');h.links=[];if(!cab)return;
+  Object.values(C.circ).forEach(c=>{let prevId=cab.id;c.order.forEach(o=>{const l={id:uid(),a:prevId,b:o.p.id};if(prevId===cab.id)l.code=c.code;h.links.push(l);prevId=o.p.id})});
+  // los mandos de luz de cada estancia se unen a su luz más cercana
+  h.items.filter(i=>HI[i.k].sw).forEach(sw=>{if(h.links.some(l=>l.a===sw.id||l.b===sw.id))return;const r=roomAt(h,sw.x,sw.y),ls=h.items.filter(i=>(i.k==='luz'||i.k==='foco')&&roomAt(h,i.x,i.y)===r).sort((a,b)=>hdist(a,sw)-hdist(b,sw));if(ls[0])h.links.push({id:uid(),a:ls[0].id,b:sw.id})})}

@@ -1,18 +1,22 @@
 'use strict';
 /* Editor 2D de la casa: plano grande y claro, símbolos, leyenda, rutas y modo simulación interactivo */
-const CS={tool:'sel',place:null,rtype:'salon',sel:null,cat:'ele',layers:{ele:1,tel:1,cli:1,agu:1,gas:1},routes:true,labels:'main',drag:null,prev:null,sim:false,zoom:1,wide:false,cache:null};
+const CS={tool:'sel',place:null,rtype:'salon',sel:null,cat:'ele',layers:{ele:1,tel:1,cli:1,agu:1,gas:1},routes:true,labels:'main',drag:null,prev:null,sim:false,zoom:1,wide:false,cache:null,wfrom:null,wcode:'C1'};
 const hexs=n=>'#'+n.toString(16).padStart(6,'0');
 const SHORT={luz:'Luz',foco:'Foco',interruptor:'Interruptor',conmutador:'Conmutador',cruzamiento:'Cruce',pulsador:'Pulsador',regulador:'Regulador',detector:'Detector',timbre:'Timbre',toma:'Enchufe',toma_ext:'Enchufe ext.',toma_bano:'Enchufe baño',toma_enc:'Enchufe encim.',toma_horno:'Horno',toma_lav:'Lavadora',toma_lvj:'Lavavajillas',toma_sec:'Secadora',extractor:'Extractor',cuadro:'CUADRO',tv:'TV',rj45:'Datos',router:'Router',ap:'WiFi',videop:'Videoport.',alarma:'Alarma',sensor:'Sensor',camara:'Cámara',dom:'Domótica',split_i:'Split',split_e:'Ud. ext.',radiador:'Radiador',suelo:'Suelo radiante',termostato:'Termostato',termo:'Termo',aerot:'Aerotermia',caldera:'Caldera',solar:'Solar',deposito:'Depósito',rad_agua:'Rad. agua',llave:'Llave agua',cont_agua:'Cont. agua',lavabo:'Lavabo',ducha:'Ducha',banera:'Bañera',inodoro:'WC',bide:'Bidé',fregadero:'Fregadero',lav_agua:'Agua lavad.',lvj_agua:'Agua lavav.',grifo_ext:'Grifo ext.',gas_cont:'Contador gas',gas_cocina:'Cocina gas',gas_calentador:'Calentador',gas_rejilla:'Rejilla vent.',gas_humos:'Humos'};
 const COMMON=['luz','foco','interruptor','conmutador','toma','tv','rj45','toma_bano','toma_enc','sensor'];
 const planBox=h=>({w:Math.max(300,...h.rooms.map(r=>r.x+r.w)),h:Math.max(300,...h.rooms.map(r=>r.y+r.h))});
-function csObj(){const h=HS();if(!CS.sel)return null;return CS.sel.t==='room'?h.rooms.find(r=>r.id===CS.sel.id):h.items.find(i=>i.id===CS.sel.id)}
-function casaCalc(){const h=HS(),C=houseCalc(h),codeOf={};Object.values(C.circ).forEach(c=>c.items.forEach(i=>codeOf[i.id]=c.code));CS.cache={C,iss:houseIssues(h,C),codeOf};return CS.cache}
+function csObj(){const h=HS();if(!CS.sel)return null;return CS.sel.t==='room'?h.rooms.find(r=>r.id===CS.sel.id):CS.sel.t==='link'?(h.links||[]).find(l=>l.id===CS.sel.id):h.items.find(i=>i.id===CS.sel.id)}
+function casaCalc(){const h=HS(),C=houseCalc(h),codeOf={};Object.values(C.circ).forEach(c=>c.items.forEach(i=>codeOf[i.id]=c.code));const W=h.wmode==='manual'?wiringCalc(h):null;if(W)Object.assign(codeOf,W.code);CS.cache={C,iss:houseIssues(h,C),codeOf,W};return CS.cache}
 function vCasa(){
   const h=HS(),K=casaCalc(),C=K.C,iss=K.iss,errs=iss.filter(i=>i.lv==='err').length,warns=iss.filter(i=>i.lv==='warn').length,lv=errs?'err':warns?'warn':'ok';
   const b=B(),bv=b.root?verdict(analyze(b)):null;
   const tabs=Object.entries(HCAT).map(([k,v])=>`<span class="chip ${CS.cat===k?'on':''}" style="${CS.cat===k?`border-color:${v.c}`:''};font-weight:600;color:${v.c}" onclick="CS.cat='${k}';render()">${v.n}</span>`).join('');
   const chips=Object.entries(HI).filter(([k,d])=>d.cat===CS.cat).map(([k,d])=>`<span class="chip ${CS.tool==='item'&&CS.place===k?'on':''}" onclick="CS.tool='item';CS.place='${k}';CS.sel=null;render()"><svg width="26" height="26" viewBox="-30 -30 60 60">${glyph({k,x:0,y:0},HCAT[d.cat].c,false)}</svg>${SHORT[k]||d.n}${d.kw?`<small class="muted"> ${d.kw} kW</small>`:''}</span>`).join('');
-  const palette=CS.sim?'':`<div class="card noprint" style="padding:8px"><div class="bar" style="margin:0 0 6px">${tabs}<span style="flex:1"></span><select onchange="CS.rtype=this.value">${Object.entries(RT).map(([k,v])=>`<option value="${k}" ${CS.rtype===k?'selected':''}>${v}</option>`).join('')}</select><button class="b ${CS.tool==='room'?'':'s'}" onclick="CS.tool='room';CS.sel=null;render()">+ Dibujar estancia</button><button class="b ${CS.tool==='sel'?'':'s'}" onclick="CS.tool='sel';CS.place=null;render()">Seleccionar / mover</button></div>
+  const man=h.wmode==='manual';
+  const wbar=CS.sim?'':`<div class="card noprint" style="padding:8px"><div class="bar" style="margin:0"><b>Cableado:</b><button class="b ${man?'s':''}" onclick="csWmode('auto')">Automático (el sistema cablea)</button><button class="b ${man?'':'s'}" onclick="csWmode('manual')">Manual (dibujo mis cables)</button>
+    ${man?`<button class="b ${CS.tool==='wire'?'':'s'}" style="${CS.tool==='wire'?'background:#c62828':''}" onclick="CS.tool='wire';CS.wfrom=null;CS.sel=null;render()">⚡ Dibujar cables</button><label style="margin:0">Circuito del cable que sale del cuadro</label><select onchange="CS.wcode=this.value">${Object.keys(CIRC).map(c=>`<option value="${c}" ${CS.wcode===c?'selected':''}>${c} ${CIRC[c].n}</option>`).join('')}</select><button class="b s" onclick="csAutoWire()">Cablear automáticamente</button><button class="b s" onclick="csClearWires()">Quitar todos los cables</button>`:''}</div>
+    ${man?`<p class="muted" style="font-size:12.5px;margin:6px 0 0">${CS.tool==='wire'?(CS.wfrom?'Ahora toca el elemento donde termina el cable (tócalo otra vez para cancelar; si ya hay cable entre los dos, se quita).':'Toca el elemento donde empieza el cable (el cuadro, una luz, una toma…). Los cables del cuadro llevan el circuito elegido arriba y los demás lo heredan.'):'Pulsa «Dibujar cables» y une los elementos. Toca un cable para cambiar su sección o quitarlo.'}</p>`:'<p class="muted" style="font-size:12.5px;margin:6px 0 0">En modo manual tú dibujas cada cable y el sistema comprueba si está bien conectado: elementos sin cable, circuitos mezclados, luces sin interruptor, secciones y tierra.</p>'}</div>`;
+  const palette=CS.sim?'':wbar+`<div class="card noprint" style="padding:8px"><div class="bar" style="margin:0 0 6px">${tabs}<span style="flex:1"></span><select onchange="CS.rtype=this.value">${Object.entries(RT).map(([k,v])=>`<option value="${k}" ${CS.rtype===k?'selected':''}>${v}</option>`).join('')}</select><button class="b ${CS.tool==='room'?'':'s'}" onclick="CS.tool='room';CS.sel=null;render()">+ Dibujar estancia</button><button class="b ${CS.tool==='sel'?'':'s'}" onclick="CS.tool='sel';CS.place=null;render()">Seleccionar / mover</button></div>
     <div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div><p class="muted" style="font-size:12.5px;margin:6px 0 0">${CS.tool==='room'?'Arrastra sobre el plano para dibujar la estancia.':CS.tool==='item'?'Toca el plano para colocar «'+esc(HI[CS.place].n)+'».':'Toca un elemento o estancia para editarlo; arrástralo para moverlo.'}</p></div>`;
   const top=`<div class="bar noprint"><select onchange="if(this.value){csTpl(this.value)}"><option value="">Plantilla de casa…</option>${Object.entries(HTPL).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('')}</select><button class="b s" onclick="csClear()">Vaciar</button>
     <button class="b ${CS.sim?'s':''}" onclick="csSim(false)">✎ Editar plano</button><button class="b ${CS.sim?'':'s'}" style="${CS.sim?'background:#c62828':''}" onclick="csSim(true)">▶ Simular funcionamiento</button><span style="flex:1"></span>
@@ -27,7 +31,8 @@ function vCasa(){
     <div style="overflow:auto;max-height:${CS.wide?'88vh':'80vh'};border-radius:6px;border:1px solid var(--bd)"><svg id="cs-svg" viewBox="-80 -80 ${planBox(h).w+160} ${planBox(h).h+150}" style="width:${CS.zoom*100}%;min-width:${CS.wide?'100%':'560px'};height:auto;background:#fff;touch-action:${CS.zoom>1?'pan-x pan-y':'none'};display:block">
     <defs><radialGradient id="glw"><stop offset="0" stop-color="#ffe680" stop-opacity=".95"/><stop offset="1" stop-color="#ffe680" stop-opacity="0"/></radialGradient><pattern id="hat" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 14L14 0" stroke="#e5a" stroke-width="2"/></pattern></defs><g id="cs-g"></g></svg></div>${legend}</div>`;
   const side=CS.sim?`<div id="hs-panel">${hsPanel()}</div>`:inspCasa(h,C);
-  const right=`<div>${side}
+  const chk=checklistHTML(iss,h);
+  const right=`<div>${chk}${side}
    <div class="card"><div class="chk ${lv}" style="font-weight:700;margin:0 0 8px">${lv==='ok'?'✔ CASA VÁLIDA':lv==='warn'?'⚠ VÁLIDA CON AVISOS ('+warns+')':'✖ NO VÁLIDA · '+errs+' fallo'+(errs>1?'s':'')}</div>
    ${bv?`<div class="chk ${bv.lv}" style="margin:0 0 8px">Cuadro: ${bv.txt}</div>`:'<div class="chk info" style="margin:0 0 8px">Aún no hay cuadro: pulsa «Generar cuadro desde la casa».</div>'}
    <div class="bar"><button class="b" onclick="csEquip()">Equipar según normativa</button><button class="b" onclick="csGen()">Generar cuadro desde la casa</button></div>
@@ -40,7 +45,8 @@ function vCasa(){
   return top+palette+`<div class="gc ${CS.wide?'wide':''}">${plan}${right}</div>`;
 }
 window.csSim=on=>{if(on){hsInit();CS.sim=true;CS.sel=null;CS.tool='sel'}else CS.sim=false;render()};
-function inspCasa(h,C){const o=csObj();if(!o)return'<div class="card muted">Selecciona una estancia o un elemento del plano para editarlo.</div>';
+function inspCasa(h,C){const o=csObj();if(!o)return'<div class="card muted">Selecciona una estancia, un elemento o un cable del plano para editarlo.</div>';
+  if(CS.sel.t==='link')return inspLink(h,o);
   if(CS.sel.t==='room')return`<div class="card"><h3>Estancia</h3><label>Nombre</label><input value="${esc(o.name)}" style="width:100%" onchange="csSet('name',this.value)">
    <label>Tipo</label><select style="width:100%" onchange="csSet('type',this.value)">${Object.entries(RT).map(([k,v])=>`<option value="${k}" ${o.type===k?'selected':''}>${v}</option>`).join('')}</select>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${['x','y','w','h'].map(f=>`<div><label>${{x:'X (cm)',y:'Y (cm)',w:'Ancho (cm)',h:'Alto (cm)'}[f]}</label><input type="number" step="10" value="${o[f]}" onchange="csSet('${f}',num(this.value))"></div>`).join('')}</div>
@@ -53,8 +59,8 @@ function inspCasa(h,C){const o=csObj();if(!o)return'<div class="card muted">Sele
    ${d.l!=null?`<label>Capacidad (litros)</label><input type="number" value="${o.l||d.l}" onchange="csSet('l',num(this.value))">`:''}
    ${d.kwg?`<p style="margin:6px 0 0">Gas: ${d.kwg} kW</p>`:''}${d.ud?`<p style="margin:2px 0 0">Caudal: ${d.ud} L/s</p>`:''}
    <div class="bar" style="margin-top:8px"><button class="b s" onclick="csDup()">Duplicar</button><button class="b d" onclick="csDel()">Eliminar</button></div></div>`}
-window.csSet=(f,v)=>{const o=csObj();if(!o)return;o[f]=v||v===0?v:undefined;if(f==='circ'&&!v)delete o.circ;save();render()};
-window.csDel=()=>{const h=HS();if(!CS.sel)return;if(CS.sel.t==='room')h.rooms=h.rooms.filter(r=>r.id!==CS.sel.id);else h.items=h.items.filter(i=>i.id!==CS.sel.id);CS.sel=null;render()};
+window.csSet=(f,v)=>{const o=csObj();if(!o)return;o[f]=(v||v===0||v===false)?v:undefined;if(f==='circ'&&!v)delete o.circ;save();render()};
+window.csDel=()=>{const h=HS();if(!CS.sel)return;if(CS.sel.t==='room')h.rooms=h.rooms.filter(r=>r.id!==CS.sel.id);else if(CS.sel.t==='link')h.links=(h.links||[]).filter(l=>l.id!==CS.sel.id);else{h.items=h.items.filter(i=>i.id!==CS.sel.id);h.links=(h.links||[]).filter(l=>l.a!==CS.sel.id&&l.b!==CS.sel.id)}CS.sel=null;render()};
 window.csDup=()=>{const o=csObj();if(!o||CS.sel.t!=='item'||HI[o.k].unique)return;const n={...o,id:uid(),x:o.x+30,y:o.y+30};HS().items.push(n);CS.sel={t:'item',id:n.id};render()};
 window.csClear=()=>{if(!confirm('¿Vaciar la casa?'))return;P().house=newHouse();CS.sel=null;render()};
 window.csTpl=k=>{if(HS().rooms.length&&!confirm('Se reemplazará la casa actual.'))return;P().house=loadHouse(k);CS.sel=null;CS.sim=false;render()};
@@ -111,9 +117,11 @@ function itemSVG(it,sel,bad,K){const d=HI[it.k],cat=HCAT[d.cat].c,code=K.codeOf[
     else if(it.k==='cuadro'){const any=Object.keys(SIMH.trip).some(k=>SIMH.trip[k]);if(any)post='<rect x="-26" y="-28" width="52" height="56" rx="6" fill="none" stroke="#c62828" stroke-width="5" class="pulse"/><text y="-36" text-anchor="middle" font-size="15" font-weight="800" fill="#c62828">DISPARO</text>'}
     if(code&&!live&&d.cat==='ele'&&it.k!=='cuadro')op=0.45;if(SIMH.sel===it.id)pre+='<circle r="34" fill="none" stroke="#0b7a4b" stroke-width="4" stroke-dasharray="6 5"/>'}
   const label=(CS.labels==='all'||(CS.labels==='main'&&!COMMON.includes(it.k)))?`<text y="${it.k==='cuadro'?42:38}" text-anchor="middle" font-size="14" font-weight="600" fill="#334" stroke="#fff" stroke-width="4" paint-order="stroke">${SHORT[it.k]||d.n}${code&&d.cat==='ele'&&it.k!=='cuadro'&&!CS.sim?' · '+code:''}</text>`:'';
+  const nc=K.W&&needsWire(it)&&!K.W.code[it.id],conf=K.W&&K.W.conf[it.id];
+  const wmark=CS.wfrom===it.id?'<circle r="36" fill="none" stroke="#c62828" stroke-width="5" stroke-dasharray="6 5"/>':nc?'<circle r="34" fill="none" stroke="#c62828" stroke-width="4" stroke-dasharray="6 5"/><text y="-40" text-anchor="middle" font-size="13" font-weight="800" fill="#c62828">SIN CABLE</text>':conf?'<circle r="34" fill="none" stroke="#e08a00" stroke-width="4"/><text y="-40" text-anchor="middle" font-size="13" font-weight="800" fill="#e08a00">'+conf.join('+')+'</text>':'';
   const selMark=!CS.sim&&sel?'<circle r="32" fill="none" stroke="#0b7a4b" stroke-width="5"/>':'';
   const badge=bad?`<circle cx="22" cy="-22" r="9" fill="${bad==='err'?'#c62828':'#e08a00'}" stroke="#fff" stroke-width="3"/><text x="22" y="-17" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">!</text>`:'';
-  return`<g transform="translate(${it.x} ${it.y}) scale(1.15)" opacity="${op}" data-id="${it.id}">${pre}${selMark}${glyph(it,cat,lit,col)}${label}${post}${badge}</g>`}
+  return`<g transform="translate(${it.x} ${it.y}) scale(1.15)" opacity="${op}" data-id="${it.id}">${pre}${selMark}${wmark}${glyph(it,cat,lit,col)}${label}${post}${badge}</g>`}
 window.casaDraw=()=>{const g=document.getElementById('cs-g');if(!g)return;const h=HS(),K=CS.cache||casaCalc(),C=K.C,bad={};K.iss.forEach(i=>{if(i.id&&(!bad[i.id]||i.lv==='err'))bad[i.id]=i.lv});const S=CS.sim?SIMH.m:null;
   const pb=planBox(h);let s='';for(let x=0;x<=pb.w;x+=100){s+=`<line x1="${x}" y1="0" x2="${x}" y2="${pb.h}" stroke="#eef1f3" stroke-width="2"/><line x1="${x}" y1="-14" x2="${x}" y2="0" stroke="#889" stroke-width="2"/>${x%200===0?`<text x="${x}" y="-24" text-anchor="middle" font-size="20" fill="#667">${x/100} m</text>`:''}`}
   for(let y=0;y<=pb.h;y+=100)s+=`<line x1="0" y1="${y}" x2="${pb.w}" y2="${y}" stroke="#eef1f3" stroke-width="2"/><line x1="-14" y1="${y}" x2="0" y2="${y}" stroke="#889" stroke-width="2"/>${y%200===0?`<text x="-22" y="${y+7}" text-anchor="end" font-size="20" fill="#667">${y/100} m</text>`:''}`;
@@ -123,8 +131,10 @@ window.casaDraw=()=>{const g=document.getElementById('cs-g');if(!g)return;const 
     s+=`<text x="${r.x+r.w/2}" y="${r.y+r.h-26}" text-anchor="middle" font-size="30" font-weight="800" fill="#37474f" opacity=".85" pointer-events="none" stroke="#fff" stroke-width="5" paint-order="stroke">${esc(r.name||RT[r.type])}</text><text x="${r.x+r.w/2}" y="${r.y+r.h-62}" text-anchor="middle" font-size="22" fill="#667" pointer-events="none" stroke="#fff" stroke-width="4" paint-order="stroke">${(r.w/100).toFixed(1)} × ${(r.h/100).toFixed(1)} m · ${(r.w*r.h/10000).toFixed(1)} m²</text>`;
     if(sel&&!CS.sim)s+=`<rect x="${r.x+r.w-16}" y="${r.y+r.h-16}" width="28" height="28" fill="#0b7a4b" stroke="#fff" stroke-width="3"/>`});
   const path=(a,b)=>`M${a.x} ${a.y} H${b.x} V${b.y}`;
+  if(h.wmode==='manual'&&CS.layers.ele){const W=K.W||wiringCalc(h),by={};h.items.forEach(i=>by[i.id]=i);(h.links||[]).forEach(l=>{const a=by[l.a],b=by[l.b];if(!a||!b)return;const code=W.link[l.id]||l.code,col=code?hexs(CIRCCOL[code]||0x555555):'#9aa7b0',sel=CS.sel&&CS.sel.t==='link'&&CS.sel.id===l.id,live=S&&code&&hsLive(code)&&(SIMH.cur.I[code]||0)>0.01;
+    s+=`<g data-link="${l.id}"><line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="${sel?9:6}" stroke-linecap="round" opacity=".85" ${live?'class="flow"':''} ${code?'':'stroke-dasharray="10 8"'}/>${l.pe===false?`<text x="${(a.x+b.x)/2}" y="${(a.y+b.y)/2-8}" text-anchor="middle" font-size="13" font-weight="800" fill="#c62828">sin tierra</text>`:''}${l.sec?`<text x="${(a.x+b.x)/2}" y="${(a.y+b.y)/2+16}" text-anchor="middle" font-size="12" fill="#334" stroke="#fff" stroke-width="3" paint-order="stroke">${l.sec} mm²</text>`:''}</g>`})}
   if(CS.routes){
-    if(CS.layers.ele)Object.values(C.circ).forEach(c=>c.segs.forEach(sg=>{const live=!S||hsLive(c.code),act=S&&live&&(SIMH.cur.I[c.code]||0)>0.01;
+    if(CS.layers.ele&&h.wmode!=='manual')Object.values(C.circ).forEach(c=>c.segs.forEach(sg=>{const live=!S||hsLive(c.code),act=S&&live&&(SIMH.cur.I[c.code]||0)>0.01;
       s+=`<path d="${path(sg.a,sg.b)}" fill="none" stroke="${live?hexs(CIRCCOL[c.code]):'#b0b6bb'}" stroke-width="${act?7:4.5}" stroke-opacity="${live?0.85:0.5}" ${act?'class="flow"':''} ${!live?'stroke-dasharray="4 8"':''} pointer-events="none"/>`}));
     if(CS.layers.tel)C.tel.forEach(t=>{s+=`<path d="${path(t.a,t.it)}" fill="none" stroke="${t.coax?'#7e57c2':'#00acc1'}" stroke-width="3.5" stroke-dasharray="12 9" pointer-events="none"/>`});
     const wOpen=S&&h.items.some(i=>HI[i.k].ud&&SIMH.run[i.id]),hOpen=S&&h.items.some(i=>HI[i.k].hot&&SIMH.run[i.id]&&hsHotOk(S)),gOpen=S&&h.items.some(i=>HI[i.k].kwg&&SIMH.run[i.id]);
@@ -140,14 +150,17 @@ function casaMount(){const svg=document.getElementById('cs-svg');if(!svg)return;
     if(CS.sim)return null;
     if(CS.sel&&CS.sel.t==='room'){const r=h.rooms.find(x=>x.id===CS.sel.id);if(r&&Math.abs(q.x-(r.x+r.w))<=30&&Math.abs(q.y-(r.y+r.h))<=30)return{t:'room',id:r.id,resize:true}}
     const rs=h.rooms.filter(r=>q.x>=r.x&&q.x<=r.x+r.w&&q.y>=r.y&&q.y<=r.y+r.h).sort((a,b)=>a.w*a.h-b.w*b.h);return rs[0]?{t:'room',id:rs[0].id}:null};
+  const hitLink=q=>{const h=HS(),by={};h.items.forEach(i=>by[i.id]=i);let best=null,bd=14;(h.links||[]).forEach(l=>{const a=by[l.a],b=by[l.b];if(!a||!b)return;const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((q.x-a.x)*dx+(q.y-a.y)*dy)/L2)),d=Math.hypot(q.x-(a.x+t*dx),q.y-(a.y+t*dy));if(d<bd){bd=d;best=l.id}});return best};
   svg.onpointerdown=e=>{const q=pt(e),h=HS();
     if(CS.sim){const ht=hit(q);if(ht&&ht.t==='item'){if(SIMH.delMode)hsDelId(ht.id);else{hsClick(ht.id);hsRefresh(true);casaDraw()}}else{const r=HS().rooms.filter(r=>q.x>=r.x&&q.x<=r.x+r.w&&q.y>=r.y&&q.y<=r.y+r.h).sort((a,b)=>a.w*a.h-b.w*b.h)[0];if(r){SIMH.room=r.id;hsRefresh(true);casaDraw()}}return}
     svg.setPointerCapture(e.pointerId);
+    if(CS.tool==='wire'&&h.wmode==='manual'){const ht=hit(q);if(ht&&ht.t==='item'){wireClick(ht.id);render()}else{const lk=hitLink(q);if(lk){CS.sel={t:'link',id:lk};CS.wfrom=null;render()}else{CS.wfrom=null;CS.sel=null;render()}}return}
     if(CS.tool==='room'){CS.drag={m:'room',a:{x:sn(q.x),y:sn(q.y)}};CS.prev={x:sn(q.x),y:sn(q.y),w:0,h:0};return}
     if(CS.tool==='item'&&CS.place){const d=HI[CS.place];let it=d.unique?h.items.find(i=>i.k===CS.place):null;
       if(it){it.x=sn(q.x,5);it.y=sn(q.y,5)}else{it={id:uid(),k:CS.place,x:sn(q.x,5),y:sn(q.y,5)};if(CS.place==='suelo'){it.w=200;it.d=150}h.items.push(it)}
       CS.sel={t:'item',id:it.id};if(d.unique){CS.tool='sel';CS.place=null}render();return}
-    const ht=hit(q);CS.sel=ht;
+    let ht=hit(q);if(!ht||ht.t==='room'){const lk=h.wmode==='manual'?hitLink(q):null;if(lk)ht={t:'link',id:lk}}CS.sel=ht;
+    if(ht&&ht.t==='link'){CS.drag=null;render();return}
     if(ht){const o=csObj();CS.drag={m:ht.resize?'resize':'move',off:{x:q.x-o.x,y:q.y-o.y},moved:false}}else CS.drag=null;casaDraw()};
   svg.onpointermove=e=>{if(!CS.drag)return;const q=pt(e),d=CS.drag;
     if(d.m==='room'){CS.prev={x:Math.min(d.a.x,sn(q.x)),y:Math.min(d.a.y,sn(q.y)),w:Math.abs(sn(q.x)-d.a.x),h:Math.abs(sn(q.y)-d.a.y)};casaDraw();return}
@@ -160,3 +173,22 @@ function casaMount(){const svg=document.getElementById('cs-svg');if(!svg)return;
     if(d.moved){h.w=Math.max(h.w,...h.rooms.map(r=>r.x+r.w+100));h.h=Math.max(h.h,...h.rooms.map(r=>r.y+r.h+100))}
     render()};
   document.onkeydown=e=>{if(tab!=='casa'||CS.sim||/INPUT|SELECT|TEXTAREA/.test((document.activeElement||{}).tagName||''))return;if((e.key==='Delete'||e.key==='Backspace')&&CS.sel){e.preventDefault();csDel()}}}
+
+function checklistHTML(iss,h){if(!h.rooms.length)return'';const man=h.wmode==='manual',rows=[];
+  const row=(t,l)=>{const e=l.filter(i=>i.lv==='err').length,w=l.filter(i=>i.lv==='warn').length;rows.push({t,e,w,l})};
+  if(man){row('Todo está conectado al cuadro',iss.filter(i=>i.tag==='cable'));row('Cada elemento en su circuito',iss.filter(i=>i.tag==='circuito'));row('Cada luz con su mando',iss.filter(i=>i.tag==='mando'))}
+  row('Normativa eléctrica (puntos, circuitos, baño)',iss.filter(i=>i.cat==='ele'&&!i.tag));row('Telecomunicaciones y domótica',iss.filter(i=>i.cat==='tel'));row('Climatización y agua caliente',iss.filter(i=>i.cat==='cli'));row('Fontanería',iss.filter(i=>i.cat==='agu'));row('Gas',iss.filter(i=>i.cat==='gas'));
+  const E=rows.reduce((s,r)=>s+r.e,0),W=rows.reduce((s,r)=>s+r.w,0),lv=E?'err':W?'warn':'ok';
+  return`<div class="card" style="border:2px solid ${lv==='ok'?'#2e7d32':lv==='warn'?'#e08a00':'#c62828'}"><h3 style="margin:0 0 6px">¿Está bien conectado?</h3><div style="font-size:17px;font-weight:800;color:${lv==='ok'?'#2e7d32':lv==='warn'?'#e08a00':'#c62828'}">${lv==='ok'?'✔ SÍ: la instalación está bien':lv==='warn'?'⚠ Funciona, pero con avisos ('+W+')':'✖ NO: hay '+E+' fallo'+(E>1?'s':'')+' que corregir'}</div>
+   <div style="margin-top:6px">${rows.map(r=>`<div style="display:flex;gap:6px;font-size:13px;padding:2px 0"><span style="width:20px;color:${r.e?'#c62828':r.w?'#e08a00':'#2e7d32'}">${r.e?'✖':r.w?'⚠':'✔'}</span><span style="flex:1">${r.t}</span><span class="muted">${r.e?r.e+' fallo'+(r.e>1?'s':''):r.w?r.w+' aviso'+(r.w>1?'s':''):'bien'}</span></div>`).join('')}</div></div>`}
+window.csWmode=m=>{HS().wmode=m;if(m==='manual'&&!(HS().links||[]).length&&HS().items.some(i=>i.k==='cuadro')&&confirm('¿Cablear automáticamente como punto de partida? (podrás cambiar cualquier cable)'))autoWire(HS());CS.tool=m==='manual'?'wire':'sel';CS.wfrom=null;render()};
+window.csAutoWire=()=>{if((HS().links||[]).length&&!confirm('Se reemplazarán los cables actuales.'))return;autoWire(HS());render()};
+window.csClearWires=()=>{if(!confirm('¿Quitar todos los cables?'))return;HS().links=[];render()};
+function wireClick(id){const h=HS();h.links=h.links||[];if(!CS.wfrom){CS.wfrom=id;return}if(CS.wfrom===id){CS.wfrom=null;return}const a=CS.wfrom,b=id,ex=h.links.findIndex(l=>(l.a===a&&l.b===b)||(l.a===b&&l.b===a));
+  if(ex>=0)h.links.splice(ex,1);else{const cab=h.items.find(i=>i.k==='cuadro'),l={id:uid(),a,b};if(cab&&(a===cab.id||b===cab.id))l.code=CS.wcode;h.links.push(l)}CS.wfrom=null}
+function inspLink(h,o){const a=h.items.find(i=>i.id===o.a),b=h.items.find(i=>i.id===o.b),K=CS.cache,code=K&&K.W&&K.W.link[o.id]||o.code;
+  return`<div class="card"><h3>Cable</h3><p class="muted" style="margin:0 0 6px">${a?esc(HI[a.k].n):'?'} ⟷ ${b?esc(HI[b.k].n):'?'} · ${code?'circuito '+code:'sin circuito (no sale del cuadro)'}</p>
+   ${o.code!==undefined?`<label>Circuito</label><select style="width:100%" onchange="csSet('code',this.value)">${Object.keys(CIRC).map(c=>`<option value="${c}" ${o.code===c?'selected':''}>${c} ${CIRC[c].n}</option>`).join('')}</select>`:''}
+   <label>Sección (mm²) — mínima ${code&&CIRC[code]?CIRC[code].sec:'—'}</label><select style="width:100%" onchange="csSet('sec',num(this.value))"><option value="">Automática</option>${[1.5,2.5,4,6,10,16].map(s=>`<option value="${s}" ${o.sec===s?'selected':''}>${s}</option>`).join('')}</select>
+   <label style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" ${o.pe===false?'':'checked'} onchange="csSet('pe',this.checked?true:false)"> Lleva conductor de protección (tierra)</label>
+   <div class="bar" style="margin-top:8px"><button class="b d" onclick="csDel()">Quitar cable</button></div></div>`}

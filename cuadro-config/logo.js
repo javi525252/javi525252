@@ -86,6 +86,7 @@ function vLogo(){
   <div class="gc"><div class="card m-center" style="padding:6px;align-self:start"><div style="overflow:auto;max-height:86vh;border:1px solid var(--bd);border-radius:6px"><svg id="lg-svg" viewBox="0 0 1000 640" style="width:100%;min-width:760px;height:auto;background:#fff;touch-action:none;display:block"><g id="lg-g"></g></svg></div>
     <p class="muted" style="font-size:12.5px;margin:6px 4px 0">Para unir: toca el <b>círculo de salida</b> (derecha de una entrada I, un bloque o un valor fijo) y después el <b>círculo de entrada</b> de otro bloque o de Q. Toca una conexión ya hecha para quitarla. Verde = señal activa.</p></div>
    <div><div id="lg-panel">${lgPanel()}</div>
+   <div class="card"><h3>Comprobar la instalación</h3><p class="muted" style="font-size:12.5px;margin:0 0 6px">Prueba automáticamente todas las combinaciones de entradas y dice qué salidas funcionan y cuáles fallan.</p><button class="b" onclick="lgDoCheck()">🔍 Comprobar ahora</button>${LG.check?'<div style="margin-top:8px">'+LG.check.map(i=>`<div class="chk ${i.lv}">${esc(i.msg)}</div>`).join('')+'</div>':''}</div>
    <div class="card"><h3>Validación del programa</h3><div class="chk ${errs?'err':warns?'warn':'ok'}" style="font-weight:700;margin:0 0 6px">${errs?'✖ '+errs+' fallo'+(errs>1?'s':''):warns?'⚠ Con avisos ('+warns+')':'✔ Programa correcto'}</div>${iss.map(i=>`<div class="chk ${i.lv}">${esc(i.msg)}</div>`).join('')||'<div class="chk ok">Sin incidencias.</div>'}</div></div></div>`}
 function lgIssues(g){const o=[],used=new Set();g.blocks.forEach(b=>b.in.forEach(r=>{if(r)used.add(r)}));Object.values(g.qin).forEach(r=>{if(r)used.add(r)});
   g.blocks.forEach(b=>{const d=LGT[b.t];(d.ins||[]).forEach((nm,i)=>{if(!b.in[i]&&(['sr','toggle','ton','tof','tp','flash','edge','cmp','count'].includes(b.t)&&i===0||b.t==='sr'&&i<2))o.push({lv:'warn',msg:`${d.n} (${b.id}): la entrada ${nm||i+1} no está conectada.`})});
@@ -96,6 +97,25 @@ function lgIssues(g){const o=[],used=new Set();g.blocks.forEach(b=>b.in.forEach(
   const bu=Object.keys(g.q).find(q=>g.q[q].t==='blind_up'&&g.qin[q]),bd=Object.keys(g.q).find(q=>g.q[q].t==='blind_down'&&g.qin[q]);
   if(bu&&bd){let both=false;const s=JSON.stringify(g);/* comprobación estática simple: ¿comparten un enclavamiento? */const interl=g.blocks.some(b=>b.t==='not'&&(b.in[0]===g.qin[bu]||b.in[0]===g.qin[bd]));if(!interl)o.push({lv:'warn',msg:`Persiana: ${bu} (subir) y ${bd} (bajar) no tienen enclavamiento. Si se activan a la vez, el motor se daña. Usa un NO cruzado como en el ejemplo.`})}
   if(g.blocks.length>32)o.push({lv:'err',msg:'Demasiados bloques para un autómata de este tipo (máx. 32).'});
+  // tipos de señal: digital / analógica
+  g.blocks.forEach(b=>b.in.forEach((r,i)=>{if(!r)return;const d=LGT[b.t],isAI=/^AI/.test(r);
+    if(b.t==='cmp'&&!isAI)o.push({lv:'err',msg:`Comparador ${b.id}: su entrada debe ser una señal analógica (AI1/AI2); has conectado ${r}, que es digital.`});
+    else if(b.t!=='cmp'&&isAI)o.push({lv:'warn',msg:`${d.n} (${b.id}): conectas una entrada analógica (${r}) a una entrada digital. Pásala antes por un comparador analógico.`})}));
+  Object.keys(g.qin).forEach(q=>{if(/^AI/.test(g.qin[q]||''))o.push({lv:'err',msg:`${q}: no se puede conectar una señal analógica directamente a una salida.`});if(g.qin[q]==='hi')o.push({lv:'info',msg:`${q} está fija en 1: siempre activa.`});if(g.qin[q]==='lo')o.push({lv:'info',msg:`${q} está fija en 0: nunca se activa.`})});
+  // bloques que no influyen en ninguna salida
+  const reach=new Set(),stack=Object.values(g.qin).filter(Boolean);while(stack.length){const r=stack.pop();if(reach.has(r))continue;reach.add(r);const b=g.blocks.find(x=>x.id===r);if(b)b.in.forEach(x=>{if(x)stack.push(x)})}
+  g.blocks.forEach(b=>{if(!reach.has(b.id)&&used.has(b.id))o.push({lv:'warn',msg:`${LGT[b.t].n} (${b.id}): está cableado pero no llega a ninguna salida Q.`})});
+  Object.keys(g.ins).forEach(k=>{if(!used.has(k)&&g.blocks.length)o.push({lv:'info',msg:`${k} (${g.ins[k].n}) no se usa en el programa.`})});
+  // parámetros y lazos
+  g.blocks.forEach(b=>{const p=b.p||{};if('T' in p&&!(p.T>0))o.push({lv:'err',msg:`${LGT[b.t].n} (${b.id}): el tiempo T debe ser mayor que 0.`});
+    if(b.t==='week'&&!p.days.some(Boolean))o.push({lv:'warn',msg:`Reloj semanal (${b.id}): no tiene ningún día marcado, nunca se activará.`});
+    if(b.t==='week'&&p.on===p.off)o.push({lv:'warn',msg:`Reloj semanal (${b.id}): la hora de conexión y desconexión es la misma.`});
+    if(b.t==='sr'&&!b.in[1])o.push({lv:'warn',msg:`Biestable SR (${b.id}): sin entrada R, una vez activado nunca se desactiva.`});
+    if(b.t==='count'&&!b.in[2])o.push({lv:'info',msg:`Contador (${b.id}): sin entrada de reset R, solo se puede bajar con la dirección.`});
+    if(b.t==='cmp'&&b.p.hy<0)o.push({lv:'err',msg:`Comparador (${b.id}): histéresis negativa.`})});
+  const memo=['sr','toggle','ton','tof','tp','flash','count','cmp','edge'],visiting={},loops=new Set();
+  const dfs=id=>{const b=g.blocks.find(x=>x.id===id);if(!b)return;if(visiting[id]===1){loops.add(id);return}if(visiting[id]===2)return;visiting[id]=1;if(!memo.includes(b.t))b.in.forEach(r=>{if(r&&!/^(I|AI|hi|lo)/.test(r))dfs(r)});visiting[id]=2};
+  g.blocks.forEach(b=>dfs(b.id));if(loops.size)o.push({lv:'err',msg:`Lazo sin memoria ni temporizador entre bloques (${[...loops].join(', ')}): la señal oscilaría. Añade un biestable o un retardo.`});
   const maxQ=Math.max(0,...qs.map(q=>+q.slice(1)));if(maxQ>4)o.push({lv:'info',msg:`Usas hasta Q${maxQ}: necesitas ${Math.ceil((maxQ-4)/4)} módulo(s) de ampliación de salidas.`});
   if(LG.blindFault)o.push({lv:'err',msg:'EN DIRECTO: subir y bajar activos a la vez en la persiana. ¡Motor en riesgo!'});
   return o}
@@ -180,3 +200,35 @@ function logoBOM(proj){const g=proj&&proj.logo;if(!g||!g.blocks.length&&!Object.
   rows.push({p:{id:'lg_psu',kind:'house',name:'Fuente de alimentación 24 V (si el autómata es de 24 V)',price:38},qty:1});
   const ct=qs.filter(q=>{const d=g.q[q],A=d.kw*1000/230,ind=['pump','blind_up','blind_down','fan','lock','siren'].includes(d.t);return A>(ind?3:10)}).length;if(ct)rows.push({p:{id:'lg_ct',kind:'house',name:'Contactor para cargas que superan el relé',price:24},qty:ct});
   return rows}
+
+// ---------- comprobador automático: prueba todas las combinaciones de entradas ----------
+function lgCheck(){const g=lgProg(),res=[],used=new Set();g.blocks.forEach(b=>b.in.forEach(r=>{if(r)used.add(r)}));Object.values(g.qin).forEach(r=>{if(r)used.add(r)});
+  const ins=Object.keys(g.ins).filter(k=>used.has(k)),ais=Object.keys(g.ai).filter(k=>used.has(k)),qs=Object.keys(g.qin).filter(q=>g.qin[q]);
+  if(!qs.length)return[{lv:'err',msg:'No hay ninguna salida conectada: no hay nada que comprobar.'}];
+  const snap={I:LG.I,AI:LG.AI,out:LG.out,st:LG.st,t:LG.t,clock:LG.clock,Q:LG.Q,blind:LG.blind,fault:LG.blindFault};
+  const maxT=Math.max(5,...g.blocks.map(b=>(b.p&&(b.p.T||b.p.ton+b.p.toff))||0)),horizon=Math.min(120,maxT+6),dt=0.5,steps=Math.round(horizon/dt);
+  const comb=1<<Math.min(ins.length,10),aiVals=ais.map(k=>[g.ai[k].min,(g.ai[k].min+g.ai[k].max)/2,g.ai[k].max]);
+  const ever={},always={},osc={},both=[];qs.forEach(q=>{ever[q]=false;always[q]=true;osc[q]=0});let runs=0;
+  const hasFlash=g.blocks.some(b=>b.t==='flash');
+  const aiCombos=ais.length?aiVals.reduce((a,v)=>a.flatMap(x=>v.map(y=>x.concat([y]))),[[]]).slice(0,27):[[]];
+  const upD=Object.keys(g.q).filter(q=>g.q[q].t==='blind_up'&&g.qin[q]),dnD=Object.keys(g.q).filter(q=>g.q[q].t==='blind_down'&&g.qin[q]);
+  const sim=(clock,av,inFn,nsteps)=>{runs++;LG.I={};LG.AI=Object.assign({},snap.AI);ais.forEach((k,i)=>LG.AI[k]=av[i]);LG.out={};LG.st={};LG.t=0;LG.clock=clock;LG.blind=0;const last={},tog={};qs.forEach(q=>{tog[q]=0});
+    for(let s=0;s<nsteps;s++){ins.forEach(k=>{LG.I[k]=!!inFn(k,s)});lgEval(g,dt);qs.forEach(q=>{if(LG.Q[q])ever[q]=true;else always[q]=false;if(s>nsteps-12&&last[q]!==undefined&&last[q]!==LG.Q[q])tog[q]++;last[q]=LG.Q[q]});
+      if(upD.length&&dnD.length&&upD.some(q=>LG.Q[q])&&dnD.some(q=>LG.Q[q])&&both.length<3)both.push(ins.filter(k=>LG.I[k]).join('+')||'ninguna entrada')}
+    qs.forEach(q=>{if(tog[q]>=8)osc[q]++})};
+  // 1) todas las combinaciones fijas de entradas
+  for(let m=0;m<comb;m++)for(const av of aiCombos)sim(snap.clock,av,k=>m>>ins.indexOf(k)&1,steps);
+  // 2) pulsando cada entrada varias veces (contadores, telerruptores…)
+  ins.forEach(k=>sim(snap.clock,aiCombos[0],(x,s)=>x===k&&s<24&&(Math.floor(s/2)%2===0),30));
+  // 3) a la hora de cada reloj semanal
+  g.blocks.filter(b=>b.t==='week').forEach(b=>{const d=Math.max(0,b.p.days.findIndex(Boolean));sim(d*86400+(hm(b.p.on)+1)*60,aiCombos[0],()=>0,steps);sim(d*86400+(hm(b.p.on)+1)*60,aiCombos[0],k=>ins.indexOf(k)%2,steps)});
+  res.push({lv:'info',msg:`Se han probado ${runs} situaciones: todas las combinaciones de ${ins.length} entradas${ais.length?', valores bajo/medio/alto de las analógicas':''}, pulsaciones repetidas y las horas de los relojes semanales (hasta ${horizon} s cada una).`});
+  LG.I=snap.I;LG.AI=snap.AI;LG.out=snap.out;LG.st=snap.st;LG.t=snap.t;LG.clock=snap.clock;LG.Q=snap.Q;LG.blind=snap.blind;LG.blindFault=snap.fault;
+  qs.forEach(q=>{const n=g.q[q].n;if(!ever[q])res.push({lv:'err',msg:`${q} (${n}) NO se activa nunca con ninguna combinación de entradas: el programa no funciona para esa salida.`});
+    else if(always[q])res.push({lv:'warn',msg:`${q} (${n}) está SIEMPRE activa, hagas lo que hagas con las entradas.`});
+    else res.push({lv:'ok',msg:`${q} (${n}) responde bien: se activa y se desactiva según las entradas.`});
+    if(osc[q]&&!hasFlash)res.push({lv:'warn',msg:`${q} (${n}) parpadea sola en ${osc[q]} situaciones sin que haya un bloque intermitente: revisa realimentaciones.`})});
+  if(both.length)res.push({lv:'err',msg:`PERSIANA: subir y bajar se activan a la vez con: ${[...new Set(both)].join(' | ')}. Falta enclavamiento: el motor se dañaría.`});
+  else if(upD.length&&dnD.length)res.push({lv:'ok',msg:'Persiana: con ninguna combinación se activan subir y bajar a la vez (enclavamiento correcto).'});
+  return res}
+window.lgDoCheck=()=>{LG.check=lgCheck();render()};

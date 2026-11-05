@@ -7,6 +7,7 @@ const RUNNABLE=['toma_horno','toma_lav','toma_lvj','toma_sec','split_i','radiado
 const SIMH={latch:{},dim:{},ring:{},room:null,delMode:false,main:true,trip:{},off:{},heat:{},sw:{},plug:{},run:{},leak:{},short:{},log:[],ex:null,t:0,speed:5,m:null,sel:null,warned:{},cur:{I:{}},sig:''};
 function hsMap(){
   const h=HS(),H=houseCalc(h),codeOf={};Object.values(H.circ).forEach(c=>c.items.forEach(i=>codeOf[i.id]=c.code));
+  const W=h.wmode==='manual'?wiringCalc(h):null;if(W)Object.assign(codeOf,W.code);
   const b=B(),groups=[],known=Object.keys(H.circ);let igaIn=40;
   if(b.root&&b.root.children){igaIn=(prod(b.root.pid)||{}).in||40;
     b.root.children.forEach(n=>{const p=prod(n.pid)||{};if(n.circ&&known.includes(n.circ))groups.push({id:n.id,label:n.label||'Circuito',diff:null,codes:[n.circ]});
@@ -14,19 +15,19 @@ function hsMap(){
   const have=new Set(groups.flatMap(g=>g.codes)),rest=known.filter(c=>!have.has(c));
   for(let i=0;i<rest.length;i+=5)groups.push({id:'g'+i,label:'Diferencial '+(groups.length+1),diff:{id:'d'+i},codes:rest.slice(i,i+5)});
   const gOf={};groups.forEach(g=>g.codes.forEach(c=>gOf[c]=g));
-  return{h,H,codeOf,groups,gOf,igaIn}}
+  return{h,H,codeOf,groups,gOf,igaIn,W}}
 function hsInit(keep){const m=hsMap();Object.assign(SIMH,{latch:{},dim:{},ring:{},delMode:false,main:true,trip:{},off:{},heat:{},sw:{},plug:{},run:{},leak:{},short:{},log:[],ex:null,t:0,warned:{},cur:{I:{}},sig:'',m});if(!keep)SIMH.sel=null;hsStart();hsSay('Simulación lista. Pulsa interruptores, enchufa aparatos o prueba un ejemplo.')}
 function hsSay(txt,lv){SIMH.log.unshift({t:SIMH.t,txt,lv:lv||''});if(SIMH.log.length>30)SIMH.log.pop()}
-const itemCode=(m,it)=>m.codeOf[it.id]||(HI[it.k].sw?'C1':HI[it.k].pw?'C2':null);
-function hsLive(code){const m=SIMH.m;if(!m||!code)return !!SIMH.main&&!SIMH.trip.iga;const g=m.gOf[code];
+const itemCode=(m,it)=>{const c=m.codeOf[it.id];if(c)return c;if(m.W&&needsWire(it))return 'NC';return HI[it.k].sw?'C1':HI[it.k].pw?'C2':null};
+function hsLive(code){const m=SIMH.m;if(code==='NC')return false;if(!m||!code)return !!SIMH.main&&!SIMH.trip.iga;const g=m.gOf[code];
   return SIMH.main&&!SIMH.off.iga&&!SIMH.trip.iga&&!SIMH.off['b_'+code]&&!SIMH.trip['b_'+code]&&!(g&&g.diff&&(SIMH.trip['d_'+g.id]||SIMH.off['d_'+g.id]))}
 const CTRL=['interruptor','conmutador','cruzamiento','pulsador','regulador','detector'];
-function roomSwitches(m,r){return m.h.items.filter(i=>CTRL.includes(i.k)&&roomAt(m.h,i.x,i.y)===r)}
-function lightOn(m,it){const r=roomAt(m.h,it.x,it.y),sw=r?roomSwitches(m,r):[];if(!sw.length)return true;
+function roomSwitches(m,r,it){return m.h.items.filter(i=>CTRL.includes(i.k)&&roomAt(m.h,i.x,i.y)===r&&(!m.W||!it||(m.codeOf[i.id]&&famOk(m.codeOf[it.id]||'C1',m.codeOf[i.id]))))}
+function lightOn(m,it){const r=roomAt(m.h,it.x,it.y),sw=r?roomSwitches(m,r,it):[];if(!sw.length)return true;
   const two=sw.filter(s=>s.k==='conmutador'||s.k==='cruzamiento'),pul=sw.filter(s=>s.k==='pulsador');let on=false;
   if(two.length>=2)on=two.reduce((a,s)=>a^(SIMH.sw[s.id]?1:0),0)===1;else if(two.length===1)on=!!SIMH.sw[two[0].id];
   return on||sw.some(s=>(s.k==='interruptor'||s.k==='regulador'||s.k==='detector')&&SIMH.sw[s.id])||(pul.length>0&&!!SIMH.latch[r.id])}
-function brightness(m,it){const r=roomAt(m.h,it.x,it.y);const reg=r&&roomSwitches(m,r).find(s=>s.k==='regulador'&&SIMH.sw[s.id]);return reg?(SIMH.dim[reg.id]||100)/100:1}
+function brightness(m,it){const r=roomAt(m.h,it.x,it.y);const reg=r&&roomSwitches(m,r,it).find(s=>s.k==='regulador'&&SIMH.sw[s.id]);return reg?(SIMH.dim[reg.id]||100)/100:1}
 function ctrlText(m,r){const sw=roomSwitches(m,r),n=k=>sw.filter(s=>s.k===k).length;const parts=[];['interruptor','conmutador','cruzamiento','pulsador','regulador','detector'].forEach(k=>{if(n(k))parts.push(`${n(k)} ${HI[k].n.toLowerCase()}`)});
   return parts.length?`La luz de ${r.name||RT[r.type]} se maneja con: ${parts.join(', ')}.`:`${r.name||RT[r.type]} no tiene ningún mecanismo de maniobra: la luz queda SIEMPRE encendida y no se puede apagar.`}
 function kwNow(m,it){const k=it.k;

@@ -325,23 +325,29 @@ function buildCasa(C,R,root){
     const t=mkText(r.name||RT[r.type]);t.scale.set(48,7,1);t.position.set(r.x+r.w/2,6,r.y+r.h/2);root.add(t)});
   // código de circuito de cada elemento
   const codeOf={};Object.values(H.circ).forEach(c=>c.items.forEach(i=>codeOf[i.id]=c.code));
-  const cab=h.items.find(i=>i.k==='cuadro');
+  const cab=h.items.find(i=>i.k==='cuadro'),WK=h.wmode==='manual'?wiringCalc(h):null;
   h.items.forEach(it=>{const d=HI[it.k],r=roomAt(h,it.x,it.y);const m=mkHouseItem(it,d,r,H);const g=m.g;
     let x=it.x,z=it.y,ry=0;
     if(m.wall&&r){const dl=x-r.x,dr=r.x+r.w-x,dt=z-r.y,db=r.y+r.h-z,mn=Math.min(dl,dr,dt,db);
       if(mn===dt){z=r.y+6;ry=0}else if(mn===db){z=r.y+r.h-6;ry=Math.PI}else if(mn===dl){x=r.x+6;ry=Math.PI/2}else{x=r.x+r.w-6;ry=-Math.PI/2}}
     g.position.set(x,m.wall?(d.hz||0):0,z);g.rotation.y=ry;
     let code=codeOf[it.id]||(d.sw?'C1':null);if(it.k==='router'||it.k==='ap'||d.pw)code='C2';
+    if(WK){code=WK.code[it.id]||(needsWire(it)?'NC':(d.pw?'C2':null))}
     const cn=code&&C.circNode[code];g.userData={key:cn&&['luz','foco','interruptor','conmutador','extractor'].includes(it.k)||cn&&d.circ?cn.key:(cn&&d.sw?cn.key:null),itemId:it.id};
     if(!g.userData.key&&cn&&(d.pw||d.sw))g.userData.key=cn.key;
     g.traverse(o=>{o.userData.dev=g});root.add(g);R.pick.push(g);R.hitems.push({id:it.id,k:it.k,item:it,circ:code,upd:m.upd})});
-  // cables eléctricos por circuito (techo)
+  // cables eléctricos (techo): automáticos por circuito o los dibujados a mano
+  if(!WK){
   Object.values(H.circ).forEach(c=>{const cn=C.circNode[c.code],id=cn?cn.n.id:null,rad=1.0+c.def.sec*0.05;
     c.segs.forEach(sg=>{const d=HI[sg.it.k],hz=d.hz||30,a=sg.a,b=sg.b;
       const pts=[new THREE.Vector3(a.x,238,a.y),new THREE.Vector3(b.x,238,a.y),new THREE.Vector3(b.x,238,b.y)];
       addCable(R,root,pts,rad,c.code,null,12).hcirc=c.code;
       if(hz<230)addCable(R,root,[new THREE.Vector3(b.x,238,b.y),new THREE.Vector3(b.x,Math.max(hz,5)+12,b.y)],rad,c.code,null,6).hcirc=c.code});
     if(c.segs[0]&&cab)addCable(R,root,[new THREE.Vector3(cab.x,238,cab.y),new THREE.Vector3(cab.x,150,cab.y)],rad,c.code,null,6).hcirc=c.code});
+  }else{const by={};h.items.forEach(x=>by[x.id]=x);(h.links||[]).forEach(l=>{const a=by[l.a],b=by[l.b];if(!a||!b)return;const code=WK.link[l.id]||l.code,col=code?CIRCCOL[code]:0x9aa7b0,hz=HI[b.k].hz||30;
+      const pts=[new THREE.Vector3(a.x,238,a.y),new THREE.Vector3(b.x,238,a.y),new THREE.Vector3(b.x,238,b.y)];
+      if(code){CC[code]=CIRCCOL[code];addCable(R,root,pts,1.2,code,null,12).hcirc=code;if(hz<230)addCable(R,root,[new THREE.Vector3(b.x,238,b.y),new THREE.Vector3(b.x,Math.max(hz,5)+12,b.y)],1.2,code,null,6).hcirc=code}
+      else{tube(root,pts,1.2,col)}})}
   // tuberías: agua fría, caliente, gas; datos
   H.pipes.forEach(p=>{const col=p.t==='cold'?0x1e88e5:p.t==='hot'?0xe53935:0xfb8c00,y=p.t==='cold'?12:p.t==='hot'?20:28,rad=1.5+p.dn/14;
     tube(root,[new THREE.Vector3(p.a.x,y,p.a.y),new THREE.Vector3(p.b.x,y,p.a.y),new THREE.Vector3(p.b.x,y,p.b.y)],rad,col)});
