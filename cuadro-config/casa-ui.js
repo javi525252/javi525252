@@ -6,7 +6,7 @@ const SHORT={luz:'Luz',foco:'Foco',interruptor:'Interruptor',conmutador:'Conmuta
 const COMMON=['luz','foco','interruptor','conmutador','toma','tv','rj45','toma_bano','toma_enc','sensor'];
 const planBox=h=>({w:Math.max(300,...h.rooms.map(r=>r.x+r.w)),h:Math.max(300,...h.rooms.map(r=>r.y+r.h))});
 function csObj(){const h=HS();if(!CS.sel)return null;return CS.sel.t==='room'?h.rooms.find(r=>r.id===CS.sel.id):CS.sel.t==='link'?(h.links||[]).find(l=>l.id===CS.sel.id):h.items.find(i=>i.id===CS.sel.id)}
-function casaCalc(){const h=HS(),C=houseCalc(h),codeOf={};Object.values(C.circ).forEach(c=>c.items.forEach(i=>codeOf[i.id]=c.code));const W=h.wmode==='manual'?wiringCalc(h):null;if(W)Object.assign(codeOf,W.code);CS.cache={C,iss:houseIssues(h,C),codeOf,W};return CS.cache}
+function casaCalc(){const h=HS(),C=houseCalc(h),codeOf={};Object.values(C.circ).forEach(c=>c.items.forEach(i=>codeOf[i.id]=c.code));const W=h.wmode==='manual'?wiringCalc(h):null;if(W)Object.assign(codeOf,W.code);CS.cache={C,iss:houseIssues(h,C),codeOf,W,nUnw:W?h.items.filter(i=>needsWire(i)&&!W.code[i.id]).length:0};return CS.cache}
 function vCasa(){
   const h=HS(),K=casaCalc(),C=K.C,iss=K.iss,errs=iss.filter(i=>i.lv==='err').length,warns=iss.filter(i=>i.lv==='warn').length,lv=errs?'err':warns?'warn':'ok';
   const b=B(),bv=b.root?verdict(analyze(b)):null;
@@ -118,7 +118,7 @@ function itemSVG(it,sel,bad,K){const d=HI[it.k],cat=HCAT[d.cat].c,code=K.codeOf[
     if(code&&!live&&d.cat==='ele'&&it.k!=='cuadro')op=0.45;if(SIMH.sel===it.id)pre+='<circle r="34" fill="none" stroke="#0b7a4b" stroke-width="4" stroke-dasharray="6 5"/>'}
   const label=(CS.labels==='all'||(CS.labels==='main'&&!COMMON.includes(it.k)))?`<text y="${it.k==='cuadro'?42:38}" text-anchor="middle" font-size="14" font-weight="600" fill="#334" stroke="#fff" stroke-width="4" paint-order="stroke">${SHORT[it.k]||d.n}${code&&d.cat==='ele'&&it.k!=='cuadro'&&!CS.sim?' · '+code:''}</text>`:'';
   const nc=K.W&&needsWire(it)&&!K.W.code[it.id],conf=K.W&&K.W.conf[it.id];
-  const wmark=CS.wfrom===it.id?'<circle r="36" fill="none" stroke="#c62828" stroke-width="5" stroke-dasharray="6 5"/>':nc?'<circle r="34" fill="none" stroke="#c62828" stroke-width="4" stroke-dasharray="6 5"/><text y="-40" text-anchor="middle" font-size="13" font-weight="800" fill="#c62828">SIN CABLE</text>':conf?'<circle r="34" fill="none" stroke="#e08a00" stroke-width="4"/><text y="-40" text-anchor="middle" font-size="13" font-weight="800" fill="#e08a00">'+conf.join('+')+'</text>':'';
+  const wmark=CS.wfrom===it.id?'<circle r="36" fill="none" stroke="#c62828" stroke-width="5" stroke-dasharray="6 5"/>':nc?'<circle r="34" fill="none" stroke="#c62828" stroke-width="4" stroke-dasharray="6 5"/>'+(K.nUnw<=6?'<text y="-40" text-anchor="middle" font-size="13" font-weight="800" fill="#c62828">SIN CABLE</text>':''):conf?'<circle r="34" fill="none" stroke="#e08a00" stroke-width="4"/><text y="-40" text-anchor="middle" font-size="13" font-weight="800" fill="#e08a00">'+conf.join('+')+'</text>':'';
   const selMark=!CS.sim&&sel?'<circle r="32" fill="none" stroke="#0b7a4b" stroke-width="5"/>':'';
   const badge=bad?`<circle cx="22" cy="-22" r="9" fill="${bad==='err'?'#c62828':'#e08a00'}" stroke="#fff" stroke-width="3"/><text x="22" y="-17" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">!</text>`:'';
   return`<g transform="translate(${it.x} ${it.y}) scale(1.15)" opacity="${op}" data-id="${it.id}">${pre}${selMark}${wmark}${glyph(it,cat,lit,col)}${label}${post}${badge}</g>`}
