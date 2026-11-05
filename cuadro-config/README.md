@@ -44,3 +44,6 @@ Pestaña **Casa (plano)**: dibujas las estancias en un plano 2D, colocas element
 - **genera el cuadro eléctrico desde la casa** y lo valida;
 - muestra la casa en **3D** (vista «Casa 3D» de Montaje 3D) con luces, aparatos, cables y tuberías, y permite provocar fallos en cualquier circuito.
 Plantillas: piso de 3 dormitorios, estudio y piso con climatización y gas. «Equipar según normativa» añade los elementos que faltan.
+
+## Simulación de la casa
+En «Casa (plano)» pulsa **▶ Simular funcionamiento**: pulsa interruptores (se encienden las luces del circuito C1), enchufa aparatos en las tomas (suben los amperios y puede saltar C2), abre grifos, enciende la cocina de gas o el termo. Hay 6 ejemplos guiados (luz, sobrecarga, cortocircuito, fuga a tierra, ducha con termo apagado, cocina de gas) y se ve qué protección salta y qué circuitos se quedan sin tensión. La misma simulación funciona en «Casa 3D».

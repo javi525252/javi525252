@@ -35,7 +35,7 @@ function phaseOf(C,it){let n=it.n;while(n){const i=C.a.info[n.id];if(i&&i.phase)
 
 // ---------- interfaz pública ----------
 M.setMode=m=>{if(M.view==='casa')m='demo';M.mode=m;M.ui.carry=null;rebuild();panels();const b=M.sim&&M.sim.banner;banner(m==='demo'&&b?b.txt:'',b?b.lv:'')};
-M.setView=v=>{M.view=v;if(v==='casa')M.mode='demo';M.ui.carry=null;M.ui.item=null;if(M.R){M.resetCam();rebuild()}panels()};
+M.setView=v=>{M.view=v;if(v==='casa'){M.mode='demo';hsInit()}M.ui.carry=null;M.ui.item=null;if(M.R){M.resetCam();rebuild()}panels()};
 M.door=v=>{M.door_=v;if(M.R&&M.R.doorG)M.R.doorG.visible=v};
 M.resetCam=()=>{const R=M.R;if(!R)return;const C=M.C;
   if(M.view==='casa'){const h=HS(),W=h.w,D=h.h;R.dim={W,D};R.cam={th:0.3,ph:0.95,r:Math.max(W,D)*1.3,t:new THREE.Vector3(W/2,30,D/2)}}
@@ -67,7 +67,7 @@ M.mount=()=>{
   const camera=new THREE.PerspectiveCamera(40,1,1,3000);
   M.R={renderer,scene,camera,root:new THREE.Group(),devs:{},cabs:[],marks:[],loads:[],alive:true,raf:0,ray:new THREE.Raycaster(),ptr:new THREE.Vector2(),ghost:null,plane:null,doorG:null,last:0,cam:null,dim:null,dl};
   scene.add(M.R.root);
-  M.C=ctx();prune(M.C);rebuild();M.resetCam();
+  M.C=ctx();prune(M.C);if(M.view==='casa'&&!SIMH.m)hsInit();rebuild();M.resetCam();
   if(!M.sim||M.sim.bid!==M.C.b.id){initSim();rebuild()}
   bindEvents(cv);panels();
   const tick=ts=>{const R=M.R;if(!R||!R.alive)return;if(!document.body.contains(cv)){M.dispose();return}
@@ -130,7 +130,7 @@ function buildCabinet(C,R,root){
   const gh=new THREE.Mesh(new THREE.BoxGeometry(1,DH,DD),new THREE.MeshBasicMaterial({color:0x2e7d32,transparent:true,opacity:0.45}));gh.visible=false;root.add(gh);R.ghost=gh;
 }
 function addCable(R,root,pts,rad,cn,id,seg){const curve=new THREE.CatmullRomCurve3(pts),mat=new THREE.MeshLambertMaterial({color:CC[cn],emissive:0});
-  const m=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,rad,6),mat);m.castShadow=true;root.add(m);const c={m,mat,id,base:CC[cn],cn,curve};dots(R,c,rad);R.cabs.push(c)}
+  const m=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,rad,6),mat);m.castShadow=true;root.add(m);const c={m,mat,id,base:CC[cn],cn,curve};dots(R,c,rad);R.cabs.push(c);return c}
 function mkSprite(txt,col){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');x.fillStyle=col;x.beginPath();x.arc(32,32,28,0,7);x.fill();x.fillStyle='#fff';x.font='bold 40px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(txt,32,34);
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));s.scale.set(3.2,3.2,1);s.renderOrder=10;s.userData.base=3.2;return s}
 function mkText(txt){const c=document.createElement('canvas');c.width=256;c.height=40;const x=c.getContext('2d');x.fillStyle='rgba(15,42,61,.88)';x.fillRect(0,0,256,40);x.fillStyle='#fff';x.font='bold 20px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(txt,128,21);
@@ -267,40 +267,44 @@ function tube(root,pts,rad,col,dash){const m=new THREE.Mesh(new THREE.TubeGeomet
 function mkHouseItem(it,d,room,H){
   const g=new THREE.Group(),k=it.k;let upd=()=>{};const wm=(w,h,dp,c,x,y,z)=>box(w,h,dp,c,x,y,z,g);
   const glowTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d'),gr=x.createRadialGradient(32,32,2,32,32,32);gr.addColorStop(0,'rgba(255,240,160,1)');gr.addColorStop(1,'rgba(255,240,160,0)');x.fillStyle=gr;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c)})();
-  const glow=(s,y)=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));sp.scale.set(s,s,1);sp.position.y=y;sp.visible=false;g.add(sp);return sp};
-  const led=(x,y,z)=>{const l=new THREE.Mesh(new THREE.SphereGeometry(1,8,6),new THREE.MeshBasicMaterial({color:0x888888}));l.position.set(x,y,z);g.add(l);return l};
-  let wall=true;
+  const glow=(s,y,col)=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));sp.scale.set(s,s,1);sp.position.y=y;sp.visible=false;if(col)sp.material.color.setHex(col);g.add(sp);return sp};
+  const led=(x,y,z,s=1)=>{const l=new THREE.Mesh(new THREE.SphereGeometry(s,8,6),new THREE.MeshBasicMaterial({color:0x888888}));l.position.set(x,y,z);g.add(l);return l};
+  const jet=(x,y,z,h)=>{const j=new THREE.Mesh(new THREE.CylinderGeometry(1.6,3.2,h,8),new THREE.MeshBasicMaterial({color:0x4aa8ff,transparent:true,opacity:0.7}));j.position.set(x,y-h/2,z);j.visible=false;g.add(j);return j};
+  let wall=true,plugBox=null,plugTag=null,lastPlug='';
+  const plugVis=(c)=>{if(c.plug!==lastPlug){lastPlug=c.plug;if(plugBox){g.remove(plugBox);plugBox=null}if(plugTag){g.remove(plugTag);plugTag=null}
+    if(c.plug){plugBox=wm(8,10,8,0xff9800,0,-8,6);plugTag=mkText(PLUGS[c.plug].n);plugTag.scale.set(26,4,1);plugTag.position.set(0,-18,6);g.add(plugTag)}}
+    if(plugBox)plugBox.material.emissive.setHex(c.live?0x884400:0)};
   if(k==='luz'){wall=false;cyl(13,13,4,0xeeeeee,0,248,0,g);const b=new THREE.Mesh(new THREE.SphereGeometry(6,12,10),new THREE.MeshBasicMaterial({color:0x666666}));b.position.y=243;g.add(b);const gl=glow(75,238);
-    upd=c=>{b.material.color.setHex(c.live?0xfff2a8:0x666666);gl.visible=c.live}}
-  else if(k==='foco'){wall=false;const b=new THREE.Mesh(new THREE.CylinderGeometry(5,5,1.5,12),new THREE.MeshBasicMaterial({color:0x777777}));b.position.y=249;g.add(b);const gl=glow(55,246);upd=c=>{b.material.color.setHex(c.live?0xfff2a8:0x777777);gl.visible=c.live}}
-  else if(k==='extractor'){wall=false;cyl(14,14,6,0xdddddd,0,247,0,g);const f=wm(22,1,3,0x999999,0,244,0);upd=c=>{if(c.live)f.rotation.y+=c.dt*12}}
-  else if(k==='interruptor'||k==='conmutador'){wm(8,12,1.6,0xf5f5f5,0,0,0.8);wm(4,6,1.2,0xdddddd,0,0,1.8)}
-  else if(k.startsWith('toma')){wm(9,9,1.6,0xf5f5f5,0,0,0.8);[-1.7,1.7].forEach(x=>cyl(0.8,0.8,0.5,0x222222,x,0,1.7,g,'z',8));const l=led(0,4,1.9);l.scale.setScalar(0.5);upd=c=>l.material.color.setHex(c.live?0x25d366:0x888888)}
+    upd=c=>{b.material.color.setHex(c.lit?0xfff2a8:0x666666);gl.visible=!!c.lit}}
+  else if(k==='foco'){wall=false;const b=new THREE.Mesh(new THREE.CylinderGeometry(5,5,1.5,12),new THREE.MeshBasicMaterial({color:0x777777}));b.position.y=249;g.add(b);const gl=glow(55,246);upd=c=>{b.material.color.setHex(c.lit?0xfff2a8:0x777777);gl.visible=!!c.lit}}
+  else if(k==='extractor'){wall=false;cyl(14,14,6,0xdddddd,0,247,0,g);const f=wm(22,1,3,0x999999,0,244,0);upd=c=>{if(c.run&&c.live)f.rotation.y+=c.dt*12}}
+  else if(k==='interruptor'||k==='conmutador'){wm(8,12,1.6,0xf5f5f5,0,0,0.8);const lv=wm(4,6,1.2,0xdddddd,0,0,1.8);const l=led(0,5.5,1.8,0.6);upd=c=>{lv.rotation.x=c.sw?-0.45:0.45;l.material.color.setHex(c.sw?0x25d366:0x888888)}}
+  else if(k.startsWith('toma')){wm(9,9,1.6,0xf5f5f5,0,0,0.8);[-1.7,1.7].forEach(x=>cyl(0.8,0.8,0.5,0x222222,x,0,1.7,g,'z',8));const l=led(0,4,1.9,0.5);upd=c=>{l.material.color.setHex(c.live?0x25d366:0x888888);if(PLUGGABLE.includes(k))plugVis(c);else if(RUNNABLE.includes(k)){if(c.run&&!plugBox){plugBox=wm(10,10,8,0xff9800,0,-8,6)}if(!c.run&&plugBox){g.remove(plugBox);plugBox=null}if(plugBox)plugBox.material.emissive.setHex(c.live?0x884400:0)}}}
   else if(k==='tv'||k==='rj45'){wm(8,8,1.6,0xeaeaea,0,0,0.8);cyl(1.3,1.3,1,k==='tv'?0x7e57c2:0x00acc1,0,0,1.8,g,'z',10)}
-  else if(k==='cuadro'){wm(36,52,12,0x6f7d88,0,0,6);wm(32,46,1.4,0x8fa1ad,0,0,12.6);const l=led(-12,-20,13.6);l.scale.setScalar(1.6);upd=c=>l.material.color.setHex(!c.on?0x888888:c.anyTrip?(Math.sin(c.t*8)>0?0xff2222:0x661111):0x25d366)}
+  else if(k==='cuadro'){wm(36,52,12,0x6f7d88,0,0,6);wm(32,46,1.4,0x8fa1ad,0,0,12.6);const l=led(-12,-20,13.6,1.6);upd=c=>l.material.color.setHex(!c.on?0x888888:c.anyTrip?(Math.sin(c.t*8)>0?0xff2222:0x661111):0x25d366)}
   else if(k==='router'||k==='ap'){wm(22,5,14,0x222222,0,0,7);const ls=[-6,0,6].map(x=>led(x,2.8,12));upd=c=>ls.forEach((l,i)=>l.material.color.setHex(c.live&&Math.sin(c.t*5+i*2)>-0.3?0x25d366:0x333333))}
   else if(k==='videop'||k==='alarma'||k==='dom'){wm(14,20,3,0xdddddd,0,0,1.5);wm(10,10,0.6,0x1a1a1a,0,3,3.2);const l=led(0,-7,3.4);upd=c=>l.material.color.setHex(c.live?0x25d366:0x888888)}
   else if(k==='sensor'){wm(8,8,5,0xf5f5f5,0,0,2.5);cyl(2.5,2.5,1,0x3355aa,0,0,5.4,g,'z',10)}
   else if(k==='camara'){wm(10,8,16,0xcfd4d8,0,0,8);cyl(3,3,3,0x111111,0,0,16.5,g,'z',10);const l=led(3.5,3,10);upd=c=>l.material.color.setHex(c.live?0xff3030:0x888888)}
-  else if(k==='split_i'){wm(92,28,22,0xf5f7f8,0,0,11);const lv=wm(80,3,10,0xdfe4e8,0,-9,20);const l=led(36,6,22.5);upd=c=>{l.material.color.setHex(c.live?0x2f9dff:0x888888);lv.rotation.x=c.live?-0.5:0}}
-  else if(k==='split_e'){wall=false;wm(80,60,30,0xe9ecee,0,30,0);const f=cyl(22,22,2,0x666666,0,30,16,g,'z',20);const bl=[0,1].map(i=>wm(40,2,1,0xaaaaaa,0,30,17.5));upd=c=>{if(c.live)f.rotation.y+=0;bl.forEach((b,i)=>{b.rotation.z=(c.t*(c.live?14:0))+i*Math.PI/2})}}
-  else if(k==='radiador'||k==='rad_agua'){const f=[];for(let i=0;i<9;i++)f.push(wm(5,50,7,0xe6e8ea,-32+i*8,0,4));upd=c=>f.forEach(x=>x.material.emissive.setHex(k==='radiador'&&c.live?0x7a2a00:0))}
-  else if(k==='suelo'){wall=false;const p=new THREE.Mesh(new THREE.PlaneGeometry(it.w||200,it.d||150),MAT(0xd9c3a0));p.rotation.x=-Math.PI/2;p.position.set((it.w||200)/2,1.2,(it.d||150)/2);g.add(p);upd=c=>p.material.emissive.setHex(c.live?0x7a2a00:0)}
+  else if(k==='split_i'){wm(92,28,22,0xf5f7f8,0,0,11);const lv=wm(80,3,10,0xdfe4e8,0,-9,20);const l=led(36,6,22.5);const gl=glow(70,-20,0x66ccff);upd=c=>{const on=c.run&&c.live;l.material.color.setHex(on?0x2f9dff:0x888888);lv.rotation.x=on?-0.5:0;gl.visible=on}}
+  else if(k==='split_e'){wall=false;wm(80,60,30,0xe9ecee,0,30,0);cyl(22,22,2,0x666666,0,30,16,g,'z',20);const bl=[0,1].map(i=>wm(40,2,1,0xaaaaaa,0,30,17.5));upd=c=>{const on=c.ext&&c.ext();if(on)bl.forEach((b,i)=>{b.rotation.z=c.t*14+i*Math.PI/2})}}
+  else if(k==='radiador'||k==='rad_agua'){const f=[];for(let i=0;i<9;i++)f.push(wm(5,50,7,0xe6e8ea,-32+i*8,0,4));upd=c=>f.forEach(x=>x.material.emissive.setHex(k==='radiador'&&c.run&&c.live?0x9a3200:0))}
+  else if(k==='suelo'){wall=false;const p=new THREE.Mesh(new THREE.PlaneGeometry(it.w||200,it.d||150),MAT(0xd9c3a0));p.rotation.x=-Math.PI/2;p.position.set((it.w||200)/2,1.2,(it.d||150)/2);g.add(p);upd=c=>p.material.emissive.setHex(c.run&&c.live?0x9a3200:0)}
   else if(k==='termostato'){wm(8,8,2.4,0xf5f5f5,0,0,1.2);wm(5,3,0.6,0x1a3a1a,0,0.5,2.6)}
-  else if(k==='termo'||k==='deposito'){wall=k==='termo';const r=k==='termo'?17:24,hh=k==='termo'?60:120;cyl(r,r,hh,0xf2f2f2,0,k==='termo'?0:hh/2,k==='termo'?r+2:0,g);const l=led(r*0.6,k==='termo'?hh/2-4:hh-8,(k==='termo'?r+2:0)+r);upd=c=>l.material.color.setHex(c.live?0xff7a00:0x888888)}
-  else if(k==='aerot'){wall=false;wm(90,70,35,0xdfe6ea,0,35,0);const f=cyl(24,24,2,0x555555,0,35,18,g,'z',20);const bl=wm(46,2,1,0x999999,0,35,19.5);upd=c=>{bl.rotation.z+=c.live?c.dt*14:0}}
-  else if(k==='caldera'||k==='gas_calentador'){wm(44,72,30,0xeceff1,0,0,15);const fl=glow(40,-8);fl.material.color.setHex(0x66aaff);upd=c=>{fl.visible=c.live;}}
+  else if(k==='termo'||k==='deposito'){wall=k==='termo';const r=k==='termo'?17:24,hh=k==='termo'?60:120;cyl(r,r,hh,0xf2f2f2,0,k==='termo'?0:hh/2,k==='termo'?r+2:0,g);const l=led(r*0.6,k==='termo'?hh/2-4:hh-8,(k==='termo'?r+2:0)+r,2);upd=c=>l.material.color.setHex(c.run&&c.live?0xff7a00:0x888888)}
+  else if(k==='aerot'){wall=false;wm(90,70,35,0xdfe6ea,0,35,0);cyl(24,24,2,0x555555,0,35,18,g,'z',20);const bl=wm(46,2,1,0x999999,0,35,19.5);upd=c=>{if(c.run&&c.live)bl.rotation.z+=c.dt*14}}
+  else if(k==='caldera'||k==='gas_calentador'){wm(44,72,30,0xeceff1,0,0,15);const fl=glow(40,-8,0x66aaff);upd=c=>{fl.visible=!!c.run}}
   else if(k==='solar'){wall=false;const p=wm(80,3,120,0x1f4aa8,0,40,0);p.rotation.x=-0.5}
   else if(k==='llave'||k==='cont_agua'){wm(14,14,10,k==='llave'?0x1565c0:0x90caf9,0,0,5);cyl(4,4,6,0xb0bec5,0,0,12,g,'z')}
   else if(k==='gas_cont'){wm(20,24,14,0xffb74d,0,0,7);cyl(3,3,6,0x777,0,0,16,g,'z')}
-  else if(k==='lavabo'){wm(60,16,44,0xffffff,0,0,22);wm(46,3,30,0xcfe3ee,0,8,22)}
+  else if(k==='lavabo'){wm(60,16,44,0xffffff,0,0,22);wm(46,3,30,0xcfe3ee,0,8,22);const j=jet(0,14,28,12);upd=c=>{j.visible=!!c.run}}
   else if(k==='inodoro'){wall=false;wm(38,40,20,0xffffff,0,20,0);wm(40,4,52,0xffffff,0,42,26);cyl(17,14,38,0xffffff,0,19,28,g)}
   else if(k==='bide'){wall=false;cyl(16,13,34,0xffffff,0,17,14,g)}
-  else if(k==='ducha'){wall=false;const b=wm(80,5,80,0xe8eef2,40,2.5,40);cyl(0.8,0.8,150,0xb0bec5,70,75,70,g);cyl(10,10,2,0xb0bec5,70,152,70,g)}
-  else if(k==='banera'){wall=false;wm(170,50,70,0xffffff,85,25,35)}
-  else if(k==='fregadero'){wm(80,10,50,0xc7ccd1,0,0,25);wm(60,5,34,0x9aa0a6,0,5,25)}
-  else if(k==='lav_agua'||k==='lvj_agua'||k==='grifo_ext'){wm(6,6,6,0x1565c0,0,0,3);cyl(1.4,1.4,6,0xb0bec5,0,0,8,g,'z',8)}
-  else if(k==='gas_cocina'){wall=false;wm(60,85,60,0xc9ced2,0,42,0);[[-14,-14],[14,-14],[-14,14],[14,14]].forEach(([x,z])=>cyl(7,7,1,0x222,x,86,z,g))}
+  else if(k==='ducha'){wall=false;wm(80,5,80,0xe8eef2,40,2.5,40);cyl(0.8,0.8,150,0xb0bec5,70,75,70,g);cyl(10,10,2,0xb0bec5,70,152,70,g);const j=jet(70,150,70,145);upd=c=>{j.visible=!!c.run}}
+  else if(k==='banera'){wall=false;wm(170,50,70,0xffffff,85,25,35);const j=jet(10,52,35,40);upd=c=>{j.visible=!!c.run}}
+  else if(k==='fregadero'){wm(80,10,50,0xc7ccd1,0,0,25);wm(60,5,34,0x9aa0a6,0,5,25);const j=jet(0,12,40,12);upd=c=>{j.visible=!!c.run}}
+  else if(k==='lav_agua'||k==='lvj_agua'||k==='grifo_ext'){wm(6,6,6,0x1565c0,0,0,3);cyl(1.4,1.4,6,0xb0bec5,0,0,8,g,'z',8);const j=jet(0,-3,8,14);upd=c=>{j.visible=!!c.run}}
+  else if(k==='gas_cocina'){wall=false;wm(60,85,60,0xc9ced2,0,42,0);[[-14,-14],[14,-14],[-14,14],[14,14]].forEach(([x,z])=>cyl(7,7,1,0x222,x,86,z,g));const fl=glow(60,92,0xffaa33);upd=c=>{fl.visible=!!c.run}}
   else if(k==='gas_rejilla'){wm(24,12,1.2,0xeeeeee,0,0,0.6);for(let i=-2;i<=2;i++)wm(22,0.6,0.8,0x888888,0,i*2,1.4)}
   else if(k==='gas_humos'){cyl(5,5,50,0x9aa0a6,0,0,8,g,'x');wm(14,14,6,0x777,0,0,3)}
   else wm(10,10,10,hexc(HCAT[d.cat].c),0,0,5);
@@ -324,14 +328,14 @@ function buildCasa(C,R,root){
     let code=codeOf[it.id]||(d.sw?'C1':null);if(it.k==='router'||it.k==='ap'||d.pw)code='C2';
     const cn=code&&C.circNode[code];g.userData={key:cn&&['luz','foco','interruptor','conmutador','extractor'].includes(it.k)||cn&&d.circ?cn.key:(cn&&d.sw?cn.key:null),itemId:it.id};
     if(!g.userData.key&&cn&&(d.pw||d.sw))g.userData.key=cn.key;
-    g.traverse(o=>{o.userData.dev=g});root.add(g);R.pick.push(g);R.hitems.push({circ:code,upd:m.upd})});
+    g.traverse(o=>{o.userData.dev=g});root.add(g);R.pick.push(g);R.hitems.push({id:it.id,k:it.k,item:it,circ:code,upd:m.upd})});
   // cables eléctricos por circuito (techo)
   Object.values(H.circ).forEach(c=>{const cn=C.circNode[c.code],id=cn?cn.n.id:null,rad=1.0+c.def.sec*0.05;
     c.segs.forEach(sg=>{const d=HI[sg.it.k],hz=d.hz||30,a=sg.a,b=sg.b;
       const pts=[new THREE.Vector3(a.x,238,a.y),new THREE.Vector3(b.x,238,a.y),new THREE.Vector3(b.x,238,b.y)];
-      addCable(R,root,pts,rad,c.code,id,12);
-      if(hz<230)addCable(R,root,[new THREE.Vector3(b.x,238,b.y),new THREE.Vector3(b.x,Math.max(hz,5)+12,b.y)],rad,c.code,id,6)});
-    if(c.segs[0]&&cab)addCable(R,root,[new THREE.Vector3(cab.x,238,cab.y),new THREE.Vector3(cab.x,150,cab.y)],rad,c.code,id,6)});
+      addCable(R,root,pts,rad,c.code,null,12).hcirc=c.code;
+      if(hz<230)addCable(R,root,[new THREE.Vector3(b.x,238,b.y),new THREE.Vector3(b.x,Math.max(hz,5)+12,b.y)],rad,c.code,null,6).hcirc=c.code});
+    if(c.segs[0]&&cab)addCable(R,root,[new THREE.Vector3(cab.x,238,cab.y),new THREE.Vector3(cab.x,150,cab.y)],rad,c.code,null,6).hcirc=c.code});
   // tuberías: agua fría, caliente, gas; datos
   H.pipes.forEach(p=>{const col=p.t==='cold'?0x1e88e5:p.t==='hot'?0xe53935:0xfb8c00,y=p.t==='cold'?12:p.t==='hot'?20:28,rad=1.5+p.dn/14;
     tube(root,[new THREE.Vector3(p.a.x,y,p.a.y),new THREE.Vector3(p.b.x,y,p.a.y),new THREE.Vector3(p.b.x,y,p.b.y)],rad,col)});
@@ -349,16 +353,16 @@ function visuals(t,dt){
     d.userData.led.material.color.setHex(col);
     d.userData.body.material.color.setHex(st.destroyed?0x3a3330:sel?0xbfe8d0:0xd3d9de);
     if(S.fault&&S.fault.id===it.n.id)d.userData.led.scale.setScalar(1+0.6*Math.abs(Math.sin(t*10)))});
-  if(R.hitems)R.hitems.forEach(hi=>{const cn=hi.circ&&C.circNode[hi.circ];const live=!!(hi.circ?(cn&&fl.live[cn.n.id]&&S.on&&!S.burn[cn.n.id]):S.on);hi.upd({live,t,dt,anyTrip:Object.values(S.st).some(s=>s.trip||s.destroyed),on:S.on})});
+  if(R.hitems&&SIMH.m)R.hitems.forEach(hi=>{const live=hsLive(hi.circ),m=SIMH.m;hi.upd({live,t,dt,run:!!SIMH.run[hi.id],plug:SIMH.plug[hi.id]||'',sw:!!SIMH.sw[hi.id],lit:(hi.k==='luz'||hi.k==='foco')?(live&&lightOn(m,hi.item)):false,anyTrip:Object.keys(SIMH.trip).some(k=>SIMH.trip[k]),on:SIMH.main,ext:()=>m.h.items.some(i=>i.k==='split_i'&&SIMH.run[i.id]&&hsLive(itemCode(m,i)))})});
   R.loads.forEach(l=>{const n=l.it.n,live=!!(fl.live[n.id]&&S.on),st=S.fault&&S.fault.id===n.id?S.fault:null;
     const stall=!!(st&&st.opt&&st.opt.rotor&&live),phase=!!(st&&st.opt&&st.opt.phase&&live),ref=l.it.i.amp||0;
     l.upd({live:live&&!S.burn[n.id],t,dt,n,stall,phase,ratio:ref?(fl.I[n.id]||0)/ref:0});
     if(M.ui.sel===l.it.key)l.g.traverse(o=>{if(o.material&&o.material.emissive&&!o.userData.hl){}})});
   if(R.cabLed){const any=Object.values(S.st).some(s=>s.trip||s.destroyed);R.cabLed.material.color.setHex(!S.on?0x888888:any?(Math.sin(t*8)>0?0xff2222:0x661111):0x25d366)}
-  R.cabs.forEach(c=>{const live=fl.live[c.id]&&S.on,burn=S.burn[c.id],I=fl.I[c.id]||0,info=C.a.info[c.id];
+  R.cabs.forEach(c=>{const hc=c.hcirc,hI=hc?((SIMH.cur&&SIMH.cur.I[hc])||0):0,live=hc?(hsLive(hc)&&hI>0.01):(fl.live[c.id]&&S.on),burn=hc?false:S.burn[c.id],I=hc?hI:(fl.I[c.id]||0),info=hc?{amp:CIRC[hc].In*1.6}:C.a.info[c.id],kid=c.id||hc||'x';
     if(burn){c.mat.emissive.setHex(0xff3300);c.mat.color.setHex(0x331100)}
     else{c.mat.color.setHex(c.base);const hot=info&&info.amp&&I>info.amp*1.05;
-      if(live){const k=0.25+0.25*Math.sin(t*5+c.id.length);c.mat.emissive.setRGB(hot?0.9*k*2:0.1*k,hot?0.35*k*2:0.35*k,hot?0:0.7*k)}else c.mat.emissive.setHex(0)}
+      if(live){const k=0.25+0.25*Math.sin(t*5+kid.length);c.mat.emissive.setRGB(hot?0.9*k*2:0.1*k,hot?0.35*k*2:0.35*k,hot?0:0.7*k)}else c.mat.emissive.setHex(0)}
     const run=live&&!burn&&c.cn!=='N';
     if(c.dots){c.dots.forEach((d,k)=>{d.visible=!!run;if(run){const amp=info&&info.amp?I/info.amp:0.3;c.u=(c.u+dt*(0.05+Math.min(1.5,amp)*0.25)/c.dots.length)%1;d.position.copy(c.curve.getPoint((c.u+k/c.dots.length)%1))}})}});
   R.marks.forEach(m=>{const s=1+0.15*Math.sin(t*5),b=m.s.userData.base||3.2;m.s.scale.set(b*s,b*s,1)});
@@ -444,12 +448,12 @@ function updHint(){const h=$q('m-hint');if(!h)return;const u=M.ui;
 function panels(){const L=$q('m-left'),Rg=$q('m-right');if(!L||!M.C)return;const C=M.C,u=M.ui;
   const placed=C.inst.filter(it=>C.layout[it.key]).length;
   if(M.view==='casa'){const H=houseCalc(HS());
-    L.innerHTML=`<h3>Circuitos de la casa</h3><p class="muted" style="font-size:12px;margin:0 0 6px">Pulsa un circuito o un elemento del 3D para provocar fallos.</p><table style="font-size:12.5px"><tr><th>Circ.</th><th>Uso</th><th>kW</th><th>mm²</th></tr>${Object.values(H.circ).map(c=>{const l=C.circNode[c.code];return`<tr style="cursor:pointer;${l&&u.sel===l.key?'background:var(--pr2)':''}" onclick="${l?`M3D.pick('${l.key}')`:''}"><td><b style="color:${hexs(CIRCCOL[c.code])}">${c.code}</b></td><td>${esc(c.def.n)}</td><td>${f1(c.kw)}</td><td>${l?l.i.cl:c.def.sec}</td></tr>`}).join('')}</table>${C.b.root?'':'<p class="muted">Genera el cuadro desde la pestaña «Casa».</p>'}`;
+    L.innerHTML=`<h3>Circuitos de la casa</h3><p class="muted" style="font-size:12px;margin:0 0 6px">Pulsa los interruptores, tomas, aparatos y grifos en el 3D, o usa los ejemplos del panel.</p><table style="font-size:12.5px"><tr><th>Circ.</th><th>Uso</th><th>kW</th><th>mm²</th></tr>${Object.values(H.circ).map(c=>{const l=C.circNode[c.code];return`<tr style="cursor:pointer;${l&&u.sel===l.key?'background:var(--pr2)':''}" onclick="${l?`M3D.pick('${l.key}')`:''}"><td><b style="color:${hexs(CIRCCOL[c.code])}">${c.code}</b></td><td>${esc(c.def.n)}</td><td>${f1(c.kw)}</td><td>${l?l.i.cl:c.def.sec}</td></tr>`}).join('')}</table>${C.b.root?'':'<p class="muted">Genera el cuadro desde la pestaña «Casa».</p>'}`;
     if(Rg){const hi=houseIssues(HS(),H),e=hi.filter(i=>i.lv==='err').length,w=hi.filter(i=>i.lv==='warn').length,lv=e?'err':w?'warn':'ok';
       const itx=M.ui.item?HS().items.find(i=>i.id===M.ui.item):null;
       Rg.innerHTML=`<div class="chk ${lv}" style="font-weight:700;margin:0 0 10px;background:var(--card);padding:8px 10px">${lv==='ok'?'✔ CASA VÁLIDA':lv==='warn'?'⚠ VÁLIDA CON AVISOS ('+w+')':'✖ CASA NO VÁLIDA · '+e+' fallo'+(e>1?'s':'')}</div>`
         +(itx?`<div class="card"><h3>${esc(HI[itx.k].n)}</h3><p class="muted">${esc((roomAt(HS(),itx.x,itx.y)||{}).name||'fuera de estancias')}${HI[itx.k].circ||HI[itx.k].sw?' · circuito '+(itx.circ||HI[itx.k].circ||'C1'):''}</p></div>`:'')
-        +(C.b.root?demoPanel(C):'<div class="card">Genera el cuadro desde la pestaña «Casa» para simular la casa.</div>')
+        +'<div id="hs-panel">'+hsPanel()+'</div>'
         +`<div class="card"><h3>Fallos de la casa</h3>${hi.length?hi.map(i=>`<div class="chk ${i.lv}"><b>${HCAT[i.cat].n}:</b> ${esc(i.msg)}</div>`).join(''):'<div class="chk ok">Sin fallos ni avisos.</div>'}</div>`;updHint()}
     return}
   const row=it=>`<tr style="cursor:pointer;${u.sel===it.key?'background:var(--pr2)':''}" onclick="M3D.pick('${it.key}')"><td>${it.ord||''}</td><td>${esc(nameOf(it.n))}${it.n.qty>1||it.q?' '+(it.q+1):''}<br><small class="muted">${esc(it.p.name)}</small></td><td>${it.p.in||(it.p.hi||'—')}</td><td>${it.i.cable&&it.i.cl?it.i.cl+' mm²':'—'}</td><td>${it.isLoad?'':C.layout[it.key]?'✔':'○'}</td></tr>`;
@@ -518,6 +522,7 @@ function bindEvents(cv){
     else if(M.ui.carry)ghost(slotAt(e))});
   cv.addEventListener('pointerup',e=>{const wasMoved=moved>6;delete P[e.pointerId];if(wasMoved)return;
     if(M.mode==='build'){if(M.ui.carry){if(place(e))return}const k=pickDev(e);if(k&&M.C.by[k]){M.ui.sel=k;M.ui.carry=null}else if(!M.ui.carry)M.ui.sel=null;panels();return}
+    if(M.view==='casa'){pickDev(e);if(M.ui.item){hsClick(M.ui.item);hsRefresh(true);panels()}return}
     const k=pickDev(e);if(!k||!M.C.by[k])return;M.ui.sel=k;const it=M.C.by[k];
     if(!it.isLoad){const st=M.sim.st[it.n.id];
       if(st.destroyed){say('«'+nameOf(it.n)+'» está destruido: usa «Rearmar todo» para reponerlo.')}

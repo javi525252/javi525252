@@ -179,27 +179,24 @@ function perimPt(r,i,total){const ix=r.x+20,iy=r.y+20,iw=r.w-40,ih=r.h-40,P=2*(i
   if(t<iw)return{x:ix+t,y:iy};if(t<iw+ih)return{x:ix+iw,y:iy+(t-iw)};if(t<2*iw+ih)return{x:ix+iw-(t-iw-ih),y:iy+ih};return{x:ix,y:iy+ih-(t-2*iw-ih)}}
 function autoEquip(h,opt={}){
   const add=(k,x,y,extra)=>{h.items.push({id:uid(),k,x:Math.round(x),y:Math.round(y),...(extra||{})});};
-  h.rooms.forEach(r=>{let slot=0;const S=18,next=()=>perimPt(r,(slot++)%S,S),inside=()=>roomAt(h,0,0);
-    const need=roomNeeds(r);
+  const S=36,odd=(r,i)=>perimPt(r,(2*i+1)%S,S);
+  h.rooms.forEach(r=>{let slot=0;const next=()=>perimPt(r,((slot++)*2)%S,S);
+    const need=roomNeeds(r),cy=r.y+r.h/2;
     const ensure=(k,n,pos)=>{const c=countIn(h,r,k==='luz'?'luz':k);for(let i=c;i<n;i++){const p=pos?pos(i):next();add(k,p.x,p.y)}};
-    const cx=r.x+r.w/2,cy=r.y+r.h/2;
     const lightPos=n=>i=>({x:r.x+r.w*(i+1)/(n+1),y:cy});
     ensure('luz',need.luz||0,lightPos(need.luz||1));
-    if(need.luz&&countIn(h,r,'int')===0){const p=perimPt(r,0,S);add('interruptor',p.x,p.y)}
+    if(need.luz&&countIn(h,r,'int')===0){const p=next();add('interruptor',p.x,p.y)}
     ['toma','toma_enc','toma_horno','toma_bano','toma_lav','tv','rj45'].forEach(k=>{if(need[k])ensure(k,need[k])});
-    if(r.type==='bano'){const lv=['lavabo','inodoro'],kk=r.w*r.h>40000?['ducha']:[];lv.concat(kk).forEach(k=>{if(!countIn(h,r,k)){const p=perimPt(r,{lavabo:3,inodoro:9,ducha:14}[k],S);add(k,p.x,p.y)}});
-      // las tomas del baño lejos de la ducha: se recolocan en el lado del lavabo
-      h.items.filter(i=>i.k==='toma_bano'&&roomAt(h,i.x,i.y)===r).forEach(i=>{const w=h.items.find(x=>HI[x.k].wet&&roomAt(h,x.x,x.y)===r);if(w&&hdist(w,i)<70){const p=perimPt(r,4,S);i.x=Math.round(p.x);i.y=Math.round(p.y)}})}
-    if(r.type==='cocina'){if(!countIn(h,r,'fregadero')){const p=perimPt(r,5,S);add('fregadero',p.x,p.y)}if(!countIn(h,r,'lvj_agua')){const p=perimPt(r,7,S);add('lvj_agua',p.x,p.y);const q=perimPt(r,6,S);add('toma_lvj',q.x,q.y)}if(!countIn(h,r,'lav_agua')){const p=perimPt(r,8,S);add('lav_agua',p.x,p.y)}}
+    if(r.type==='bano'){const pos={lavabo:3,inodoro:9,ducha:14};['lavabo','inodoro'].concat(r.w*r.h>40000?['ducha']:[]).forEach(k=>{if(!countIn(h,r,k)){const p=odd(r,pos[k]);add(k,p.x,p.y)}});
+      h.items.filter(i=>i.k==='toma_bano'&&roomAt(h,i.x,i.y)===r).forEach(i=>{const w=h.items.find(x=>HI[x.k].wet&&roomAt(h,x.x,x.y)===r);if(w&&hdist(w,i)<70){const p=perimPt(r,8,S);i.x=Math.round(p.x);i.y=Math.round(p.y)}})}
+    if(r.type==='cocina'){if(!countIn(h,r,'fregadero')){const p=odd(r,5);add('fregadero',p.x,p.y)}if(!countIn(h,r,'lvj_agua')){const p=odd(r,8);add('lvj_agua',p.x,p.y);const q=odd(r,9);add('toma_lvj',q.x,q.y)}if(!countIn(h,r,'lav_agua')){const p=odd(r,12);add('lav_agua',p.x,p.y)}}
   });
-  const first=t=>h.rooms.find(r=>r.type===t);
-  const ves=first('vestibulo')||h.rooms[0],coc=first('cocina'),ban=first('bano');
-  if(ves&&!h.items.some(i=>i.k==='cuadro')){const p=perimPt(ves,1,10);add('cuadro',p.x,p.y)}
-  if(ves&&!h.items.some(i=>i.k==='router')){const p=perimPt(ves,5,10);add('router',p.x,p.y);add('toma',p.x+30,p.y)}
-  const wr=coc||ban;if(wr&&!h.items.some(i=>i.k==='llave')){const p=perimPt(wr,10,18);add('llave',p.x,p.y)}
-  if(ban&&!h.items.some(i=>HI[i.k].heater)){const p=perimPt(ban,1,18);add('termo',p.x,p.y,{l:30*Math.max(h.persons,1)+30})}
-  if(ves&&!h.items.some(i=>i.k==='videop')&&opt.dom){const p=perimPt(ves,2,10);add('videop',p.x,p.y)}
-  h.items=h.items.filter((i,ix,a)=>a.findIndex(j=>j.k===i.k&&Math.abs(j.x-i.x)<4&&Math.abs(j.y-i.y)<4&&j.k===i.k)===ix);
+  const first=t=>h.rooms.find(r=>r.type===t),ves=first('vestibulo')||h.rooms[0],coc=first('cocina'),ban=first('bano');
+  if(ves&&!h.items.some(i=>i.k==='cuadro')){const p=odd(ves,1);add('cuadro',p.x,p.y)}
+  if(ves&&!h.items.some(i=>i.k==='router')){const p=odd(ves,6);add('router',p.x,p.y);const q=odd(ves,7);add('toma',q.x,q.y)}
+  const wr=coc||ban;if(wr&&!h.items.some(i=>i.k==='llave')){const p=odd(wr,13);add('llave',p.x,p.y)}
+  if(ban&&!h.items.some(i=>HI[i.k].heater)){const p=odd(ban,1);add('termo',p.x,p.y,{l:30*Math.max(h.persons,1)+30})}
+  if(ves&&!h.items.some(i=>i.k==='videop')&&opt.dom){const p=odd(ves,3);add('videop',p.x,p.y)}
 }
 const HTPL={
   piso:{n:'Piso de 3 dormitorios (80 m²)',rooms:[['vestibulo',0,0,200,400],['salon',200,0,450,400],['cocina',650,0,350,400],['pasillo',0,400,1000,120],['dormitorio',0,520,300,280],['dormitorio',300,520,300,280],['dormitorio',600,520,250,280],['bano',850,520,150,280]],persons:3},
