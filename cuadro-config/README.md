@@ -36,3 +36,11 @@ Abre `index.html` en Chrome/Edge (no necesita instalación ni servidor). Los dat
 - **Motores:** guardamotores, relés térmicos, contactores AC-3, arrancadores suaves y variadores. Arranque directo, estrella-triángulo, suave y variador.
 - **Convalidación:** veredicto «válida / válida con avisos / no válida» con comprobaciones tipo REBT (ITC-BT-25 vivienda, ITC-BT-47 motores, ITC-BT-52 recarga VE, ITC-BT-40 fotovoltaica): protecciones, secciones, caída de tensión, corrientes de arranque, selectividad y poder de corte.
 - **Montaje 3D:** cuadro con carriles, canaletas, bornas, puerta y sombras; vista de **instalación completa** con motores, lámparas, cargas y cables animados; fallos (cortocircuito, sobrecarga, fuga, rotor bloqueado, falta de fase) con indicación de dónde y qué protección actúa.
+
+## Casa completa (todas las instalaciones)
+Pestaña **Casa (plano)**: dibujas las estancias en un plano 2D, colocas elementos de **eléctrica, telecomunicaciones y domótica, climatización y agua caliente, fontanería y gas**, y el sistema:
+- traza las rutas (cables por circuito, datos, tuberías de agua fría/caliente y gas) y calcula longitudes y diámetros;
+- valida la normativa de cada instalación (puntos mínimos por estancia ITC-BT-25, volúmenes de baño, circuitos C1–C12 y sus límites, ICT, splits, ACS, aparatos de gas, ventilación, humos…);
+- **genera el cuadro eléctrico desde la casa** y lo valida;
+- muestra la casa en **3D** (vista «Casa 3D» de Montaje 3D) con luces, aparatos, cables y tuberías, y permite provocar fallos en cualquier circuito.
+Plantillas: piso de 3 dormitorios, estudio y piso con climatización y gas. «Equipar según normativa» añade los elementos que faltan.

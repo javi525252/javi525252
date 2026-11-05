@@ -17,7 +17,8 @@ function ctx(){
   nodes.forEach(n=>{const i=a.info[n.id],p=i.p,q=Math.max(1,Math.round(i.eq*n.qty));
     if(p.mod>0){ord++;for(let k=0;k<q;k++){const it={key:n.id+'#'+k,n,q:k,p,i,ord};inst.push(it);by[it.key]=it}}
     else for(let k=0;k<Math.min(q,8);k++){const it={key:n.id+'#'+k,n,q:k,p,i,ord:0,isLoad:true};loads.push(it);by[it.key]=it}});
-  return{b,a,e,rows:e.rows,cols:e.cols,par,nodes,inst,loads,by,layout:b.layout};
+  const circNode={};loads.forEach(l=>{if(l.n.circ&&l.q===0)circNode[l.n.circ]=l});
+  return{b,a,e,rows:e.rows,cols:e.cols,par,nodes,inst,loads,by,layout:b.layout,circNode};
 }
 function prune(C){const L=C.layout;let ch=false;
   Object.keys(L).forEach(k=>{const it=C.by[k],q=L[k];
@@ -28,20 +29,22 @@ function fits(C,key,r,c){const it=C.by[key];if(!it||it.isLoad||r<0||r>=C.rows||c
   for(const k in C.layout){if(k===key||!C.by[k])continue;const q=C.layout[k];if(q.r===r&&c<q.c+C.by[k].p.mod&&q.c<c+it.p.mod)return false}return true}
 const geo=C=>({x0:-C.cols*MW/2,yTop:(C.rows-1)*RP/2});
 function devPos(C,it){const q=C.layout[it.key];if(!q)return null;const g=geo(C);return{x:g.x0+(q.c+it.p.mod/2)*MW,y:g.yTop-q.r*RP}}
-const locOf=(C,it)=>{if(!it)return '—';if(it.isLoad)return 'receptor de la instalación';const q=C.layout[it.key];return q?`fila ${q.r+1}, módulos ${q.c+1}–${q.c+it.p.mod}`:'sin montar'};
+const locOf=(C,it)=>{if(!it)return '—';if(it.isLoad)return it.n.circ?`circuito ${it.n.circ}`:'receptor de la instalación';const q=C.layout[it.key];return q?`fila ${q.r+1}, módulos ${q.c+1}–${q.c+it.p.mod}`:'en el cuadro'};
 const ltOf=it=>it.n.ltype||it.p.ltype||'';
 function phaseOf(C,it){let n=it.n;while(n){const i=C.a.info[n.id];if(i&&i.phase)return i.phase;n=C.par[n.id]}return 'L1'}
 
 // ---------- interfaz pública ----------
-M.setMode=m=>{M.mode=m;M.ui.carry=null;rebuild();panels();const b=M.sim&&M.sim.banner;banner(m==='demo'&&b?b.txt:'',b?b.lv:'')};
-M.setView=v=>{M.view=v;M.ui.carry=null;if(M.R){M.resetCam();rebuild()}panels()};
+M.setMode=m=>{if(M.view==='casa')m='demo';M.mode=m;M.ui.carry=null;rebuild();panels();const b=M.sim&&M.sim.banner;banner(m==='demo'&&b?b.txt:'',b?b.lv:'')};
+M.setView=v=>{M.view=v;if(v==='casa')M.mode='demo';M.ui.carry=null;M.ui.item=null;if(M.R){M.resetCam();rebuild()}panels()};
 M.door=v=>{M.door_=v;if(M.R&&M.R.doorG)M.R.doorG.visible=v};
 M.resetCam=()=>{const R=M.R;if(!R)return;const C=M.C;
-  if(M.view==='instalacion'){const d=R.dim||{W:520,D:320};R.cam={th:0.5,ph:1.12,r:Math.max(d.W,d.D)*1.15,t:new THREE.Vector3(d.W/2,100,d.D/2.4)}}
+  if(M.view==='casa'){const h=HS(),W=h.w,D=h.h;R.dim={W,D};R.cam={th:0.3,ph:0.95,r:Math.max(W,D)*1.3,t:new THREE.Vector3(W/2,30,D/2)}}
+  else if(M.view==='instalacion'){const d=R.dim||{W:520,D:320};R.cam={th:0.5,ph:1.12,r:Math.max(d.W,d.D)*1.15,t:new THREE.Vector3(d.W/2,100,d.D/2.4)}}
   else{const H=C.rows*RP+8,W=C.cols*MW+10;R.cam={th:0.28,ph:1.4,r:Math.max(H*1.45,W*1.5,60),t:new THREE.Vector3(0,0,3)}}};
-M.auto=()=>{const C=M.C;C.inst.forEach(it=>delete C.layout[it.key]);let r=0,c=0;
-  C.inst.slice().sort((x,y)=>x.ord-y.ord||x.q-y.q).forEach(it=>{if(c+it.p.mod>C.cols){r++;c=0}if(r<C.rows){C.layout[it.key]={r,c};c+=it.p.mod}});
-  save();M.ui.carry=null;rebuild();panels()};
+function autoPlace(C){C.inst.forEach(it=>delete C.layout[it.key]);let r=0,c=0;
+  C.inst.slice().sort((x,y)=>x.ord-y.ord||x.q-y.q).forEach(it=>{if(c+it.p.mod>C.cols){r++;c=0}if(r<C.rows){C.layout[it.key]={r,c};c+=it.p.mod}});save()}
+M.autoB=()=>autoPlace(ctx());
+M.auto=()=>{autoPlace(M.C);M.ui.carry=null;rebuild();panels()};
 M.clear=()=>{M.C.inst.forEach(it=>delete M.C.layout[it.key]);save();rebuild();panels()};
 M.pick=key=>{const C=M.C;if(!C.by[key])return;M.ui.sel=key;
   if(M.mode==='build'&&M.view==='cuadro'&&!C.by[key].isLoad&&!C.layout[key])M.ui.carry=key;else M.ui.carry=null;panels();updHint()};
@@ -84,7 +87,8 @@ function rebuild(){
   R.devs={};R.cabs=[];R.marks=[];R.loads=[];R.ghost=null;R.doorG=null;R.plane=null;
   M.C=ctx();const C=M.C;prune(C);
   if(M.sim)C.nodes.forEach(n=>{if(!M.sim.st[n.id])M.sim.st[n.id]={closed:true,trip:null,destroyed:false}});
-  if(M.view==='instalacion')buildInstall(C,R,root);else buildCabinet(C,R,root);
+  R.pick=null;R.hitems=[];
+  if(M.view==='casa')buildCasa(C,R,root);else if(M.view==='instalacion')buildInstall(C,R,root);else buildCabinet(C,R,root);
   // marcadores de fallo
   const iss=issueMap(C);
   C.nodes.forEach(n=>{const lv=iss[n.id];if(!lv)return;const k=n.id+'#0',g=R.devs[k];if(!g)return;
@@ -258,6 +262,82 @@ function placeIssues(C){const out=[];if(M.view!=='cuadro'&&M.view!=='instalacion
   const root=C.by[(C.b.root||{}).id+'#0'];if(root&&C.layout[root.key]&&(C.layout[root.key].r!==0||C.layout[root.key].c!==0))out.push({lv:'info',id:root.n.id,msg:'La cabecera debería ocupar la primera posición (fila 1, módulo 1).'});
   return out}
 
+// ---------- vista 3D de la casa completa ----------
+function tube(root,pts,rad,col,dash){const m=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),Math.max(6,pts.length*6),rad,6),MAT(col));m.castShadow=true;root.add(m);return m}
+function mkHouseItem(it,d,room,H){
+  const g=new THREE.Group(),k=it.k;let upd=()=>{};const wm=(w,h,dp,c,x,y,z)=>box(w,h,dp,c,x,y,z,g);
+  const glowTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d'),gr=x.createRadialGradient(32,32,2,32,32,32);gr.addColorStop(0,'rgba(255,240,160,1)');gr.addColorStop(1,'rgba(255,240,160,0)');x.fillStyle=gr;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c)})();
+  const glow=(s,y)=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));sp.scale.set(s,s,1);sp.position.y=y;sp.visible=false;g.add(sp);return sp};
+  const led=(x,y,z)=>{const l=new THREE.Mesh(new THREE.SphereGeometry(1,8,6),new THREE.MeshBasicMaterial({color:0x888888}));l.position.set(x,y,z);g.add(l);return l};
+  let wall=true;
+  if(k==='luz'){wall=false;cyl(13,13,4,0xeeeeee,0,248,0,g);const b=new THREE.Mesh(new THREE.SphereGeometry(6,12,10),new THREE.MeshBasicMaterial({color:0x666666}));b.position.y=243;g.add(b);const gl=glow(75,238);
+    upd=c=>{b.material.color.setHex(c.live?0xfff2a8:0x666666);gl.visible=c.live}}
+  else if(k==='foco'){wall=false;const b=new THREE.Mesh(new THREE.CylinderGeometry(5,5,1.5,12),new THREE.MeshBasicMaterial({color:0x777777}));b.position.y=249;g.add(b);const gl=glow(55,246);upd=c=>{b.material.color.setHex(c.live?0xfff2a8:0x777777);gl.visible=c.live}}
+  else if(k==='extractor'){wall=false;cyl(14,14,6,0xdddddd,0,247,0,g);const f=wm(22,1,3,0x999999,0,244,0);upd=c=>{if(c.live)f.rotation.y+=c.dt*12}}
+  else if(k==='interruptor'||k==='conmutador'){wm(8,12,1.6,0xf5f5f5,0,0,0.8);wm(4,6,1.2,0xdddddd,0,0,1.8)}
+  else if(k.startsWith('toma')){wm(9,9,1.6,0xf5f5f5,0,0,0.8);[-1.7,1.7].forEach(x=>cyl(0.8,0.8,0.5,0x222222,x,0,1.7,g,'z',8));const l=led(0,4,1.9);l.scale.setScalar(0.5);upd=c=>l.material.color.setHex(c.live?0x25d366:0x888888)}
+  else if(k==='tv'||k==='rj45'){wm(8,8,1.6,0xeaeaea,0,0,0.8);cyl(1.3,1.3,1,k==='tv'?0x7e57c2:0x00acc1,0,0,1.8,g,'z',10)}
+  else if(k==='cuadro'){wm(36,52,12,0x6f7d88,0,0,6);wm(32,46,1.4,0x8fa1ad,0,0,12.6);const l=led(-12,-20,13.6);l.scale.setScalar(1.6);upd=c=>l.material.color.setHex(!c.on?0x888888:c.anyTrip?(Math.sin(c.t*8)>0?0xff2222:0x661111):0x25d366)}
+  else if(k==='router'||k==='ap'){wm(22,5,14,0x222222,0,0,7);const ls=[-6,0,6].map(x=>led(x,2.8,12));upd=c=>ls.forEach((l,i)=>l.material.color.setHex(c.live&&Math.sin(c.t*5+i*2)>-0.3?0x25d366:0x333333))}
+  else if(k==='videop'||k==='alarma'||k==='dom'){wm(14,20,3,0xdddddd,0,0,1.5);wm(10,10,0.6,0x1a1a1a,0,3,3.2);const l=led(0,-7,3.4);upd=c=>l.material.color.setHex(c.live?0x25d366:0x888888)}
+  else if(k==='sensor'){wm(8,8,5,0xf5f5f5,0,0,2.5);cyl(2.5,2.5,1,0x3355aa,0,0,5.4,g,'z',10)}
+  else if(k==='camara'){wm(10,8,16,0xcfd4d8,0,0,8);cyl(3,3,3,0x111111,0,0,16.5,g,'z',10);const l=led(3.5,3,10);upd=c=>l.material.color.setHex(c.live?0xff3030:0x888888)}
+  else if(k==='split_i'){wm(92,28,22,0xf5f7f8,0,0,11);const lv=wm(80,3,10,0xdfe4e8,0,-9,20);const l=led(36,6,22.5);upd=c=>{l.material.color.setHex(c.live?0x2f9dff:0x888888);lv.rotation.x=c.live?-0.5:0}}
+  else if(k==='split_e'){wall=false;wm(80,60,30,0xe9ecee,0,30,0);const f=cyl(22,22,2,0x666666,0,30,16,g,'z',20);const bl=[0,1].map(i=>wm(40,2,1,0xaaaaaa,0,30,17.5));upd=c=>{if(c.live)f.rotation.y+=0;bl.forEach((b,i)=>{b.rotation.z=(c.t*(c.live?14:0))+i*Math.PI/2})}}
+  else if(k==='radiador'||k==='rad_agua'){const f=[];for(let i=0;i<9;i++)f.push(wm(5,50,7,0xe6e8ea,-32+i*8,0,4));upd=c=>f.forEach(x=>x.material.emissive.setHex(k==='radiador'&&c.live?0x7a2a00:0))}
+  else if(k==='suelo'){wall=false;const p=new THREE.Mesh(new THREE.PlaneGeometry(it.w||200,it.d||150),MAT(0xd9c3a0));p.rotation.x=-Math.PI/2;p.position.set((it.w||200)/2,1.2,(it.d||150)/2);g.add(p);upd=c=>p.material.emissive.setHex(c.live?0x7a2a00:0)}
+  else if(k==='termostato'){wm(8,8,2.4,0xf5f5f5,0,0,1.2);wm(5,3,0.6,0x1a3a1a,0,0.5,2.6)}
+  else if(k==='termo'||k==='deposito'){wall=k==='termo';const r=k==='termo'?17:24,hh=k==='termo'?60:120;cyl(r,r,hh,0xf2f2f2,0,k==='termo'?0:hh/2,k==='termo'?r+2:0,g);const l=led(r*0.6,k==='termo'?hh/2-4:hh-8,(k==='termo'?r+2:0)+r);upd=c=>l.material.color.setHex(c.live?0xff7a00:0x888888)}
+  else if(k==='aerot'){wall=false;wm(90,70,35,0xdfe6ea,0,35,0);const f=cyl(24,24,2,0x555555,0,35,18,g,'z',20);const bl=wm(46,2,1,0x999999,0,35,19.5);upd=c=>{bl.rotation.z+=c.live?c.dt*14:0}}
+  else if(k==='caldera'||k==='gas_calentador'){wm(44,72,30,0xeceff1,0,0,15);const fl=glow(40,-8);fl.material.color.setHex(0x66aaff);upd=c=>{fl.visible=c.live;}}
+  else if(k==='solar'){wall=false;const p=wm(80,3,120,0x1f4aa8,0,40,0);p.rotation.x=-0.5}
+  else if(k==='llave'||k==='cont_agua'){wm(14,14,10,k==='llave'?0x1565c0:0x90caf9,0,0,5);cyl(4,4,6,0xb0bec5,0,0,12,g,'z')}
+  else if(k==='gas_cont'){wm(20,24,14,0xffb74d,0,0,7);cyl(3,3,6,0x777,0,0,16,g,'z')}
+  else if(k==='lavabo'){wm(60,16,44,0xffffff,0,0,22);wm(46,3,30,0xcfe3ee,0,8,22)}
+  else if(k==='inodoro'){wall=false;wm(38,40,20,0xffffff,0,20,0);wm(40,4,52,0xffffff,0,42,26);cyl(17,14,38,0xffffff,0,19,28,g)}
+  else if(k==='bide'){wall=false;cyl(16,13,34,0xffffff,0,17,14,g)}
+  else if(k==='ducha'){wall=false;const b=wm(80,5,80,0xe8eef2,40,2.5,40);cyl(0.8,0.8,150,0xb0bec5,70,75,70,g);cyl(10,10,2,0xb0bec5,70,152,70,g)}
+  else if(k==='banera'){wall=false;wm(170,50,70,0xffffff,85,25,35)}
+  else if(k==='fregadero'){wm(80,10,50,0xc7ccd1,0,0,25);wm(60,5,34,0x9aa0a6,0,5,25)}
+  else if(k==='lav_agua'||k==='lvj_agua'||k==='grifo_ext'){wm(6,6,6,0x1565c0,0,0,3);cyl(1.4,1.4,6,0xb0bec5,0,0,8,g,'z',8)}
+  else if(k==='gas_cocina'){wall=false;wm(60,85,60,0xc9ced2,0,42,0);[[-14,-14],[14,-14],[-14,14],[14,14]].forEach(([x,z])=>cyl(7,7,1,0x222,x,86,z,g))}
+  else if(k==='gas_rejilla'){wm(24,12,1.2,0xeeeeee,0,0,0.6);for(let i=-2;i<=2;i++)wm(22,0.6,0.8,0x888888,0,i*2,1.4)}
+  else if(k==='gas_humos'){cyl(5,5,50,0x9aa0a6,0,0,8,g,'x');wm(14,14,6,0x777,0,0,3)}
+  else wm(10,10,10,hexc(HCAT[d.cat].c),0,0,5);
+  return{g,upd,wall}}
+function buildCasa(C,R,root){
+  const h=HS(),H=houseCalc(h),W=h.w,D=h.h;R.dim={W,D};R.pick=[];R.hitems=[];Object.keys(CIRCCOL).forEach(k=>CC[k]=CIRCCOL[k]);
+  const gnd=new THREE.Mesh(new THREE.PlaneGeometry(W+900,D+900),MAT(0xc8d5c2));gnd.rotation.x=-Math.PI/2;gnd.position.set(W/2,-0.6,D/2);gnd.receiveShadow=true;root.add(gnd);
+  const wmat=new THREE.MeshLambertMaterial({color:0xf3efe6,transparent:true,opacity:0.5,depthWrite:false});
+  h.rooms.forEach(r=>{const f=new THREE.Mesh(new THREE.PlaneGeometry(r.w,r.h),MAT(hexc(RCOL[r.type])));f.rotation.x=-Math.PI/2;f.position.set(r.x+r.w/2,0.4,r.y+r.h/2);f.receiveShadow=true;root.add(f);
+    [[r.w,0,-r.h/2],[r.w,0,r.h/2],[0,r.h,-r.w/2],[0,r.h,r.w/2]].forEach(([a,b,c],i)=>{const wl=new THREE.Mesh(new THREE.BoxGeometry(i<2?r.w:10,250,i<2?10:r.h),wmat);
+      wl.position.set(r.x+r.w/2+(i===2?-r.w/2:i===3?r.w/2:0),125,r.y+r.h/2+(i===0?-r.h/2:i===1?r.h/2:0));root.add(wl)});
+    const t=mkText(r.name||RT[r.type]);t.scale.set(48,7,1);t.position.set(r.x+r.w/2,6,r.y+r.h/2);root.add(t)});
+  // código de circuito de cada elemento
+  const codeOf={};Object.values(H.circ).forEach(c=>c.items.forEach(i=>codeOf[i.id]=c.code));
+  const cab=h.items.find(i=>i.k==='cuadro');
+  h.items.forEach(it=>{const d=HI[it.k],r=roomAt(h,it.x,it.y);const m=mkHouseItem(it,d,r,H);const g=m.g;
+    let x=it.x,z=it.y,ry=0;
+    if(m.wall&&r){const dl=x-r.x,dr=r.x+r.w-x,dt=z-r.y,db=r.y+r.h-z,mn=Math.min(dl,dr,dt,db);
+      if(mn===dt){z=r.y+6;ry=0}else if(mn===db){z=r.y+r.h-6;ry=Math.PI}else if(mn===dl){x=r.x+6;ry=Math.PI/2}else{x=r.x+r.w-6;ry=-Math.PI/2}}
+    g.position.set(x,m.wall?(d.hz||0):0,z);g.rotation.y=ry;
+    let code=codeOf[it.id]||(d.sw?'C1':null);if(it.k==='router'||it.k==='ap'||d.pw)code='C2';
+    const cn=code&&C.circNode[code];g.userData={key:cn&&['luz','foco','interruptor','conmutador','extractor'].includes(it.k)||cn&&d.circ?cn.key:(cn&&d.sw?cn.key:null),itemId:it.id};
+    if(!g.userData.key&&cn&&(d.pw||d.sw))g.userData.key=cn.key;
+    g.traverse(o=>{o.userData.dev=g});root.add(g);R.pick.push(g);R.hitems.push({circ:code,upd:m.upd})});
+  // cables eléctricos por circuito (techo)
+  Object.values(H.circ).forEach(c=>{const cn=C.circNode[c.code],id=cn?cn.n.id:null,rad=1.0+c.def.sec*0.05;
+    c.segs.forEach(sg=>{const d=HI[sg.it.k],hz=d.hz||30,a=sg.a,b=sg.b;
+      const pts=[new THREE.Vector3(a.x,238,a.y),new THREE.Vector3(b.x,238,a.y),new THREE.Vector3(b.x,238,b.y)];
+      addCable(R,root,pts,rad,c.code,id,12);
+      if(hz<230)addCable(R,root,[new THREE.Vector3(b.x,238,b.y),new THREE.Vector3(b.x,Math.max(hz,5)+12,b.y)],rad,c.code,id,6)});
+    if(c.segs[0]&&cab)addCable(R,root,[new THREE.Vector3(cab.x,238,cab.y),new THREE.Vector3(cab.x,150,cab.y)],rad,c.code,id,6)});
+  // tuberías: agua fría, caliente, gas; datos
+  H.pipes.forEach(p=>{const col=p.t==='cold'?0x1e88e5:p.t==='hot'?0xe53935:0xfb8c00,y=p.t==='cold'?12:p.t==='hot'?20:28,rad=1.5+p.dn/14;
+    tube(root,[new THREE.Vector3(p.a.x,y,p.a.y),new THREE.Vector3(p.b.x,y,p.a.y),new THREE.Vector3(p.b.x,y,p.b.y)],rad,col)});
+  H.tel.forEach(t=>{const a=t.a,b=t.it;tube(root,[new THREE.Vector3(a.x,232,a.y),new THREE.Vector3(b.x,232,a.y),new THREE.Vector3(b.x,232,b.y),new THREE.Vector3(b.x,40,b.y)],0.9,t.coax?0x7e57c2:0x00acc1)});
+}
+
 // ---------- visuales por fotograma ----------
 function visuals(t,dt){
   const R=M.R,C=M.C,S=M.sim;if(!S)return;const fl=flow(S.delta,true);S.fl=fl;
@@ -269,6 +349,7 @@ function visuals(t,dt){
     d.userData.led.material.color.setHex(col);
     d.userData.body.material.color.setHex(st.destroyed?0x3a3330:sel?0xbfe8d0:0xd3d9de);
     if(S.fault&&S.fault.id===it.n.id)d.userData.led.scale.setScalar(1+0.6*Math.abs(Math.sin(t*10)))});
+  if(R.hitems)R.hitems.forEach(hi=>{const cn=hi.circ&&C.circNode[hi.circ];const live=!!(hi.circ?(cn&&fl.live[cn.n.id]&&S.on&&!S.burn[cn.n.id]):S.on);hi.upd({live,t,dt,anyTrip:Object.values(S.st).some(s=>s.trip||s.destroyed),on:S.on})});
   R.loads.forEach(l=>{const n=l.it.n,live=!!(fl.live[n.id]&&S.on),st=S.fault&&S.fault.id===n.id?S.fault:null;
     const stall=!!(st&&st.opt&&st.opt.rotor&&live),phase=!!(st&&st.opt&&st.opt.phase&&live),ref=l.it.i.amp||0;
     l.upd({live:live&&!S.burn[n.id],t,dt,n,stall,phase,ratio:ref?(fl.I[n.id]||0)/ref:0});
@@ -358,10 +439,19 @@ function stepSim(dt){const S=M.sim;if(!S)return;S.t+=dt*S.speed;const f=S.fault;
 
 // ---------- paneles HTML ----------
 function updHint(){const h=$q('m-hint');if(!h)return;const u=M.ui;
-  h.textContent=M.view==='instalacion'?'Vista de la instalación: motores, lámparas y cargas se activan al haber tensión. Toca un receptor para seleccionarlo y provocar fallos.':
+  h.textContent=M.view==='casa'?'Casa 3D: las luces y aparatos se activan con tensión. Toca un elemento para ver su circuito y provocar fallos en él.':M.view==='instalacion'?'Vista de la instalación: motores, lámparas y cargas se activan al haber tensión. Toca un receptor para seleccionarlo y provocar fallos.':
     M.mode==='build'?(u.carry?'Toca un hueco del carril para colocar «'+nameOf(M.C.by[u.carry].n)+'» (Esc cancela)':'Elige un aparato de la lista y toca el carril. Arrastra para girar · rueda/pellizco para zoom'):'Toca un aparato para conectar/desconectar (o rearmar). Selecciona un circuito y provoca un fallo.'}
 function panels(){const L=$q('m-left'),Rg=$q('m-right');if(!L||!M.C)return;const C=M.C,u=M.ui;
   const placed=C.inst.filter(it=>C.layout[it.key]).length;
+  if(M.view==='casa'){const H=houseCalc(HS());
+    L.innerHTML=`<h3>Circuitos de la casa</h3><p class="muted" style="font-size:12px;margin:0 0 6px">Pulsa un circuito o un elemento del 3D para provocar fallos.</p><table style="font-size:12.5px"><tr><th>Circ.</th><th>Uso</th><th>kW</th><th>mm²</th></tr>${Object.values(H.circ).map(c=>{const l=C.circNode[c.code];return`<tr style="cursor:pointer;${l&&u.sel===l.key?'background:var(--pr2)':''}" onclick="${l?`M3D.pick('${l.key}')`:''}"><td><b style="color:${hexs(CIRCCOL[c.code])}">${c.code}</b></td><td>${esc(c.def.n)}</td><td>${f1(c.kw)}</td><td>${l?l.i.cl:c.def.sec}</td></tr>`}).join('')}</table>${C.b.root?'':'<p class="muted">Genera el cuadro desde la pestaña «Casa».</p>'}`;
+    if(Rg){const hi=houseIssues(HS(),H),e=hi.filter(i=>i.lv==='err').length,w=hi.filter(i=>i.lv==='warn').length,lv=e?'err':w?'warn':'ok';
+      const itx=M.ui.item?HS().items.find(i=>i.id===M.ui.item):null;
+      Rg.innerHTML=`<div class="chk ${lv}" style="font-weight:700;margin:0 0 10px;background:var(--card);padding:8px 10px">${lv==='ok'?'✔ CASA VÁLIDA':lv==='warn'?'⚠ VÁLIDA CON AVISOS ('+w+')':'✖ CASA NO VÁLIDA · '+e+' fallo'+(e>1?'s':'')}</div>`
+        +(itx?`<div class="card"><h3>${esc(HI[itx.k].n)}</h3><p class="muted">${esc((roomAt(HS(),itx.x,itx.y)||{}).name||'fuera de estancias')}${HI[itx.k].circ||HI[itx.k].sw?' · circuito '+(itx.circ||HI[itx.k].circ||'C1'):''}</p></div>`:'')
+        +(C.b.root?demoPanel(C):'<div class="card">Genera el cuadro desde la pestaña «Casa» para simular la casa.</div>')
+        +`<div class="card"><h3>Fallos de la casa</h3>${hi.length?hi.map(i=>`<div class="chk ${i.lv}"><b>${HCAT[i.cat].n}:</b> ${esc(i.msg)}</div>`).join(''):'<div class="chk ok">Sin fallos ni avisos.</div>'}</div>`;updHint()}
+    return}
   const row=it=>`<tr style="cursor:pointer;${u.sel===it.key?'background:var(--pr2)':''}" onclick="M3D.pick('${it.key}')"><td>${it.ord||''}</td><td>${esc(nameOf(it.n))}${it.n.qty>1||it.q?' '+(it.q+1):''}<br><small class="muted">${esc(it.p.name)}</small></td><td>${it.p.in||(it.p.hi||'—')}</td><td>${it.i.cable&&it.i.cl?it.i.cl+' mm²':'—'}</td><td>${it.isLoad?'':C.layout[it.key]?'✔':'○'}</td></tr>`;
   L.innerHTML=`<h3>Orden de montaje (${placed}/${C.inst.length})</h3><p class="muted" style="font-size:12px;margin:0 0 6px">De cabecera a circuitos finales. Pulsa uno para colocarlo.</p>
   <table style="font-size:12.5px"><tr><th>#</th><th>Aparato</th><th>In</th><th>Cable</th><th></th></tr>${C.inst.map(row).join('')}</table>
@@ -417,7 +507,7 @@ function bindEvents(cv){
     gh.visible=true;gh.scale.x=it.p.mod*MW-0.14;gh.position.set(g.x0+(s.c+it.p.mod/2)*MW,g.yTop-s.r*RP,Z0+DD/2);gh.material.color.setHex(s.ok?0x2e7d32:0xc62828)};
   const place=e=>{const s=slotAt(e);if(!s)return false;if(!s.ok){const h=$q('m-hint');if(h)h.textContent='Ahí no cabe o está ocupado.';return true}
     M.C.layout[M.ui.carry]={r:s.r,c:s.c};save();M.ui.sel=M.ui.carry;M.ui.carry=null;rebuild();panels();return true};
-  const pickDev=e=>{ndc(e);R.ray.setFromCamera(R.ptr,R.camera);const h=R.ray.intersectObjects(Object.values(R.devs),true)[0];return h&&h.object.userData.dev?h.object.userData.dev.userData.key:null};
+  const pickDev=e=>{ndc(e);R.ray.setFromCamera(R.ptr,R.camera);const h=R.ray.intersectObjects(R.pick||Object.values(R.devs),true)[0];if(!h||!h.object.userData.dev)return null;const u=h.object.userData.dev.userData;M.ui.item=u.itemId||null;if(M.view==='casa'&&!u.key){M.ui.sel=null;panels()}return u.key};
   cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);P[e.pointerId]={x:e.clientX,y:e.clientY};moved=0;last={x:e.clientX,y:e.clientY};if(Object.keys(P).length===2){const a=Object.values(P);pinch=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)}});
   cv.addEventListener('pointermove',e=>{
     if(!P[e.pointerId]){if(M.ui.carry)ghost(slotAt(e));return}

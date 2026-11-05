@@ -13,14 +13,14 @@ const LTYPES={alumbrado:'Alumbrado',tomas:'Tomas de corriente',cocina:'Cocina / 
 const USES={general:'General',vivienda:'Vivienda (ITC-BT-25)',terciario:'Terciario / comercial',industrial:'Industrial',vehiculo:'Garaje / recarga VE'};
 const PRICELISTS=[{n:'Tarifa estándar',k:1},{n:'Tarifa profesional (-12%)',k:0.88},{n:'Tarifa gran cuenta (-20%)',k:0.8}];
 
-let S, tab='design', selId=null, filter='', kindF='', dragId=null;
+let S, tab='casa', selId=null, filter='', kindF='', dragId=null;
 
 function newBoard(name='Cuadro general'){return{id:uid(),name,phases:3,isc:10,ks:0.8,reserve:25,encId:'auto',aux:8,hours:0.12,use:'general',root:null}}
 function newProj(name='Proyecto nuevo'){return{id:uid(),name,client:'',list:0,discount:0,margin:15,vat:21,rate:38,mode:'4000',boards:[newBoard()],cur:0}}
 function load(){
   try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.projects&&s.projects.length){const have=new Set(s.catalog.map(p=>p.id));DEFAULT_CATALOG.forEach(p=>{if(!have.has(p.id))s.catalog.push(structuredClone(p))});return s}}catch(e){}
   S={projects:[],cur:0,catalog:structuredClone(DEFAULT_CATALOG),enclosures:structuredClone(ENCLOSURES)};
-  const p=newProj('Proyecto de ejemplo');p.client='Cliente demo';template(p.boards[0],'local');
+  const p=newProj('Proyecto de ejemplo');p.client='Cliente demo';p.house=loadHouse('piso');genBoard(p.boards[0],p.house);
   S.projects.push(p);return S;
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -109,10 +109,11 @@ function analyze(b){
     let c=CABLES.find(x=>x[1]>=need)||CABLES[CABLES.length-1];
     if(b.use==='vivienda'&&RULES[lt]&&!n.sec){c=CABLES.find(x=>x[0]>=RULES[lt][1]&&x[1]>=need)||c}
     if(n.sec){const m=CABLES.find(x=>x[0]===n.sec);if(m){c=m;if(m[1]<need)add('err',n.id,`${L}: cable de ${m[2]||m[0]} mm² admite ${m[1]} A y el circuito necesita ${f1(need)} A${isM?' (125 % de In, ITC-BT-47)':''}.`)}}
+    const lim=lt==='alumbrado'?3:5,dvOf=s=>(three?Math.sqrt(3):2)*Math.max(ib,0)*n.len*0.0227/s/Vn*100;
+    if(!n.sec){let k=CABLES.indexOf(c);while(dvOf(c[0])>lim&&k<CABLES.length-1){k++;c=CABLES[k]}}
     o.amp=c[1];o.sec=c[0];o.cl=c[2]||String(c[0]);o.cable=o.cl+' mm²';
-    o.dv=(three?Math.sqrt(3):2)*Math.max(ib,0)*n.len*0.0227/c[0]/Vn*100;
-    cables.push({sec:c[0],cl:o.cl,m:eq*n.qty*n.len});
-    const lim=lt==='alumbrado'?3:5;
+    o.dv=dvOf(c[0]);
+    cables.push({sec:c[0],cl:o.cl,m:eq*n.qty*(n.lenTot||n.len)});
     if(o.dv>lim)add('warn',n.id,`${L}: caída de tensión ${f1(o.dv)}% (límite ${lim}%). Aumenta la sección o acorta la línea.`);
     if(!isM&&p.poles<=2&&!hasRcd)add('warn',n.id,`${L}: receptor sin protección diferencial aguas arriba.`);
     if(b.use==='vivienda'&&RULES[lt]&&prot&&['mcb','rcbo'].includes(prot.p.kind)){const [mx,ms]=RULES[lt];
@@ -223,6 +224,7 @@ function bom(proj){
     const k=enc.id;rows['enc'+k]=rows['enc'+k]||{p:{name:enc.name+' (envolvente)',price:enc.price,kind:'enc',id:'enc'+k},qty:0};rows['enc'+k].qty++;
     if(a.issues.some(i=>i.lv==='err'))ok=false;
   });
+  if(typeof houseBOM==='function')houseBOM(proj.house).forEach(r=>{rows[r.p.id]=r});
   return{rows:Object.values(rows),mods,ok};
 }
 function budget(proj){
@@ -241,16 +243,17 @@ function render(){
   const proj=P();
   $('#proj').innerHTML=S.projects.map((p,i)=>`<option value="${i}" ${i===S.cur?'selected':''}>${esc(p.name)}</option>`).join('');
   $('#proj').onchange=e=>{S.cur=+e.target.value;selId=null;render()};
-  const tabs=[['design','Diseño'],['diagram','Esquema unifilar'],['encl','Envolvente'],['m3d','Montaje 3D'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
+  const tabs=[['casa','Casa (plano)'],['design','Cuadro'],['diagram','Esquema unifilar'],['encl','Envolvente'],['m3d','Montaje 3D'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
   $('#nav').innerHTML=tabs.map(([k,n])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
-  const f={design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,m3d:vM3D,project:vProject}[tab];
+  const f={casa:vCasa,design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,m3d:vM3D,project:vProject}[tab];
   $('#app').innerHTML=boardBar()+f();
   if(tab==='design')wireDnD();
   if(tab==='m3d')M3D.mount();
+  if(tab==='casa')casaMount();
 }
 window.go=t=>{tab=t;render()};
 function boardBar(){
-  if(['catalog','project'].includes(tab))return'';
+  if(['catalog','project','casa'].includes(tab))return'';
   const p=P();
   return`<div class="bar noprint"><b>Cuadro:</b>${p.boards.map((b,i)=>`<button class="b ${i===p.cur?'':'s'}" onclick="P().cur=${i};selId=null;render()">${esc(b.name)}</button>`).join('')}
   <button class="b s" onclick="addBoard()">+ Cuadro</button><button class="b s" onclick="dupBoard()">Duplicar</button><button class="b s" onclick="delBoard()">Eliminar</button></div>`;
@@ -430,7 +433,9 @@ function vReport(){
     return`<div class="card"><h3>${esc(b.name)}</h3><p class="muted">${b.phases===3?'Trifásico 400 V':'Monofásico 230 V'} · Icc ${b.isc} kA · Simultaneidad ${b.ks} · ${esc(ce.enc.name)}</p>
     <table><tr><th>Circuito</th><th>Aparato</th><th class="r">Cant.</th><th class="r">Ib (A)</th><th>Cable</th><th></th></tr>${rows.join('')}</table>
     ${a.issues.map(i=>`<div class="chk ${i.lv}">${esc(i.msg)}</div>`).join('')}</div>`}).join('');
-  return`<div class="card"><h1 style="margin:0">${esc(p.name)}</h1><p>Cliente: ${esc(p.client||'—')} · Fecha: ${new Date().toLocaleDateString('es-ES')}</p>
+  const hs=p.house&&p.house.items.length?houseIssues(p.house):[];
+  const hcard=hs.length||(p.house&&p.house.items.length)?`<div class="card"><h3>Casa: validación de todas las instalaciones</h3>${hs.length?hs.map(i=>`<div class="chk ${i.lv}"><b>${HCAT[i.cat].n}:</b> ${esc(i.msg)}</div>`).join(''):'<div class="chk ok">Sin fallos ni avisos.</div>'}</div>`:'';
+  return hcard+`<div class="card"><h1 style="margin:0">${esc(p.name)}</h1><p>Cliente: ${esc(p.client||'—')} · Fecha: ${new Date().toLocaleDateString('es-ES')}</p>
   <div class="kpi"><div><b>${eur(t.total)}</b>Total con IVA</div><div><b>${p.boards.length}</b>cuadros</div><div><b>${t.mods}</b>módulos</div></div>
   <div class="bar noprint" style="margin-top:8px"><button class="b" onclick="window.print()">Imprimir / guardar PDF</button></div></div>${boards}
   <div class="card"><h3>Resumen económico</h3><table><tr><td>Material</td><td class="r">${eur(t.matNet)}</td></tr><tr><td>Pequeño material + montaje</td><td class="r">${eur(t.aux+t.labor)}</td></tr><tr><td>Margen</td><td class="r">${eur(t.mg)}</td></tr><tr class="tot"><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${p.vat}%</td><td class="r">${eur(t.vat)}</td></tr><tr class="tot"><td>TOTAL</td><td class="r">${eur(t.total)}</td></tr></table>
@@ -468,7 +473,7 @@ function condText(i){const p=i.p;if(p.poles>=3)return 'L1 marrón, L2 negro, L3 
 function orderList(b){const a=analyze(b),rows=[];let k=0;
   walk(b.root,(n,par,d)=>{const i=a.info[n.id];k++;rows.push({ord:k,n,par,d,i,p:i.p})});return{rows,a}}
 function vM3D(){
-  return`<div class="bar noprint"><button class="b ${M3D.view==='cuadro'?'':'s'}" onclick="M3D.setView('cuadro');render()">Cuadro</button><button class="b ${M3D.view==='instalacion'?'':'s'}" onclick="M3D.setView('instalacion');render()">Instalación completa</button><span style="width:10px"></span><button class="b ${M3D.mode==='build'?'':'s'}" onclick="M3D.setMode('build')">1 · Montaje</button><button class="b ${M3D.mode==='demo'?'':'s'}" onclick="M3D.setMode('demo')">2 · Demostración y fallos</button>
+  return`<div class="bar noprint"><button class="b ${M3D.view==='cuadro'?'':'s'}" onclick="M3D.setView('cuadro');render()">Cuadro</button><button class="b ${M3D.view==='instalacion'?'':'s'}" onclick="M3D.setView('instalacion');render()">Instalación completa</button><button class="b ${M3D.view==='casa'?'':'s'}" onclick="M3D.setView('casa');render()">Casa 3D</button><span style="width:10px"></span><button class="b ${M3D.mode==='build'?'':'s'}" onclick="M3D.setMode('build')">1 · Montaje</button><button class="b ${M3D.mode==='demo'?'':'s'}" onclick="M3D.setMode('demo')">2 · Demostración y fallos</button>
   <label style="margin:0 0 0 10px"><input type="checkbox" id="m-door" onchange="M3D.door(this.checked)"> Puerta</label>
   <button class="b s" onclick="M3D.auto()">Montaje automático</button><button class="b s" onclick="M3D.clear()">Vaciar carril</button><button class="b s" onclick="M3D.resetCam()">Cámara</button></div>
   <div class="grid g3"><div class="card" id="m-left" style="max-height:72vh;overflow:auto"></div>
