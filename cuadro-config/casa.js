@@ -28,6 +28,8 @@ const HI={
   bide:{cat:'agu',n:'Bidé',ab:'BD',pr:100,ud:0.1,dn:12,hot:1,hz:40},fregadero:{cat:'agu',n:'Fregadero',ab:'FR',pr:150,ud:0.2,dn:12,hot:1,hz:90},
   lav_agua:{cat:'agu',n:'Toma de agua lavadora',ab:'AL',pr:18,ud:0.2,dn:12,hz:90},lvj_agua:{cat:'agu',n:'Toma de agua lavavajillas',ab:'AV',pr:15,ud:0.15,dn:12,hz:40},
   grifo_ext:{cat:'agu',n:'Grifo exterior',ab:'GE',pr:12,ud:0.15,dn:12,hz:60,ext:1},
+  persiana:{cat:'tel',n:'Persiana motorizada',ab:'PE',kw:0.25,circ:'C11',hz:120,pr:180},sensor_luz:{cat:'tel',n:'Sensor de luz (crepuscular)',ab:'SL',hz:200,pr:35,an:1},sensor_temp:{cat:'tel',n:'Sensor de temperatura',ab:'ST',hz:150,pr:30,an:1},
+  electrovalvula:{cat:'agu',n:'Electroválvula de riego',ab:'EV',kw:0.02,circ:'C11',ud:0.3,dn:16,ext:1,hz:40,pr:45},
   gas_cont:{cat:'gas',n:'Contador / llave de abonado',ab:'GC',pr:90,unique:true,hz:120},gas_cocina:{cat:'gas',n:'Cocina de gas',ab:'CG',pr:280,kwg:8,hz:80},
   gas_calentador:{cat:'gas',n:'Calentador de gas',ab:'GA',pr:420,kwg:20,hz:150,heater:1,ud:0.2,dn:12},gas_rejilla:{cat:'gas',n:'Rejilla de ventilación',ab:'RV',pr:12,hz:20},gas_humos:{cat:'gas',n:'Salida de humos',ab:'SH',pr:60,hz:200}
 };
@@ -158,6 +160,7 @@ function houseIssues(h,C){
     if(i.k==='gas_cocina'&&r&&!h.items.some(x=>x.k==='gas_rejilla'&&roomAt(h,x.x,x.y)===r))bad('err','gas',i.id,'Cocina de gas sin rejilla de ventilación en la estancia.');
     if(['caldera','gas_calentador'].includes(i.k)&&!has('gas_humos'))bad('err','gas',i.id,`${nm(i)} sin salida de humos.`)});
   if(C.gas){if(C.gas.farM>25)bad('warn','gas',null,`Tubería de gas de ${C.gas.farM} m hasta el aparato más lejano: revisa el diámetro y las pérdidas.`);bad('info','gas',null,`Gas: ${C.gas.kw} kW instalados, Ø ${C.gas.edges.map(e=>e.dn).filter((v,i,a)=>a.indexOf(v)===i).join('/')} mm de cobre. Requiere instalador autorizado y prueba de estanqueidad (UNE 60670).`)}
+  if(typeof lgProg==='function'&&P().logo&&P().logo.blocks.length&&typeof lgHasLinks==='function'){h.items.filter(i=>['persiana','sensor_luz','sensor_temp','electrovalvula'].includes(i.k)).forEach(i=>{if(!lgInOf(i)&&!lgOutOf(i)&&!lgAnOf(i)&&!(typeof lgBlindQ==='function'&&(lgBlindQ(i).up||lgBlindQ(i).dn)))bad('info','tel',i.id,`${HI[i.k].n}: no está vinculado al autómata, así que no se automatiza.`)})}
   return out.concat(wiringIssues(h))}
 
 // ---------- generación del cuadro desde la casa ----------

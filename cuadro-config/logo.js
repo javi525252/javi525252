@@ -81,7 +81,7 @@ function vLogo(){
   const ex=Object.entries(LGEX).map(([k,e])=>`<option value="${k}" ${g.ex===k?'selected':''}>${e.n}</option>`).join('');
   return`<div class="bar noprint"><select onchange="if(this.value)lgLoad(this.value)"><option value="">Cargar programa de ejemplo…</option>${ex}</select><button class="b s" onclick="if(confirm('¿Borrar el programa?')){P().logo=lgNew();LG.st={};LG.out={};render()}">Borrar programa</button>
    <button class="b ${LG.run?'':'d'}" onclick="LG.run=!LG.run;render()">${LG.run?'⏸ Pausar':'▶ Ejecutar'}</button><label style="margin:0">Velocidad</label><select onchange="LG.speed=+this.value;render()">${[1,5,30,120,600].map(v=>`<option value="${v}" ${LG.speed===v?'selected':''}>×${v}</option>`).join('')}</select>
-   <button class="b" style="background:#6a1b9a" onclick="lgHouseDemo()">🏠 Demo: casa domotizada</button><span class="muted">Autómata programable tipo LOGO!: programa el esquema de funciones y pruébalo en directo.</span></div>
+   <button class="b" style="background:#6a1b9a" onclick="lgHouseDemo()">🏠 Demo: casa domotizada</button><button class="b" style="background:#6a1b9a" onclick="lgHouseDemo2()">🌿 Demo: persiana, riego y clima</button><span class="muted">Autómata programable tipo LOGO!: programa el esquema de funciones y pruébalo en directo.</span></div>
   <div class="card noprint" style="padding:8px"><div style="font-weight:600;margin-bottom:4px">Bloques (toca para añadir)</div><div style="display:flex;flex-wrap:wrap;gap:5px">${pal}</div></div>
   <div class="gc"><div class="card m-center" style="padding:6px;align-self:start"><div style="overflow:auto;max-height:86vh;border:1px solid var(--bd);border-radius:6px"><svg id="lg-svg" viewBox="0 0 1000 640" style="width:100%;min-width:760px;height:auto;background:#fff;touch-action:none;display:block"><g id="lg-g"></g></svg></div>
     <p class="muted" style="font-size:12.5px;margin:6px 4px 0">Para unir: toca el <b>círculo de salida</b> (derecha de una entrada I, un bloque o un valor fijo) y después el <b>círculo de entrada</b> de otro bloque o de Q. Toca una conexión ya hecha para quitarla. Verde = señal activa.</p></div>
@@ -117,10 +117,10 @@ function lgIssues(g){const o=[],used=new Set();g.blocks.forEach(b=>b.in.forEach(
   const dfs=id=>{const b=g.blocks.find(x=>x.id===id);if(!b)return;if(visiting[id]===1){loops.add(id);return}if(visiting[id]===2)return;visiting[id]=1;if(!memo.includes(b.t))b.in.forEach(r=>{if(r&&!/^(I|AI|hi|lo)/.test(r))dfs(r)});visiting[id]=2};
   g.blocks.forEach(b=>dfs(b.id));if(loops.size)o.push({lv:'err',msg:`Lazo sin memoria ni temporizador entre bloques (${[...loops].join(', ')}): la señal oscilaría. Añade un biestable o un retardo.`});
   const maxQ=Math.max(0,...qs.map(q=>+q.slice(1)));if(maxQ>4)o.push({lv:'info',msg:`Usas hasta Q${maxQ}: necesitas ${Math.ceil((maxQ-4)/4)} módulo(s) de ampliación de salidas.`});
-  Object.entries(g.link||{}).forEach(([k,v])=>{if(!v)return;const h=HS(),isI=/^I/.test(k),exists=v.startsWith('item:')?h.items.some(i=>'item:'+i.id===v):h.rooms.some(r=>'lights:'+r.id===v);
+  Object.entries(g.link||{}).forEach(([k,v])=>{if(!v)return;const h=HS(),isI=/^I/.test(k)&&!/^AI/.test(k),exists=/^(item|bup|bdn):/.test(v)?h.items.some(i=>v.endsWith(':'+i.id)):h.rooms.some(r=>'lights:'+r.id===v);
     if(!exists)o.push({lv:'err',msg:`${k} está vinculada a un elemento de la casa que ya no existe.`});
-    else if(!isI&&!g.qin[k])o.push({lv:'warn',msg:`${k} gobierna un elemento de la casa, pero no tiene ninguna señal conectada en el programa: nunca se activará.`});
-    else if(isI&&!used.has(k))o.push({lv:'info',msg:`${k} está vinculada al plano, pero el programa no la usa.`});
+    else if(/^Q/.test(k)&&!g.qin[k])o.push({lv:'warn',msg:`${k} gobierna un elemento de la casa, pero no tiene ninguna señal conectada en el programa: nunca se activará.`});
+    else if((isI||/^AI/.test(k))&&!used.has(k))o.push({lv:'info',msg:`${k} está vinculada al plano, pero el programa no la usa.`});
     if(!isI&&v.startsWith('item:')){const it=h.items.find(i=>'item:'+i.id===v);if(it&&HI[it.k].sw)o.push({lv:'warn',msg:`${k} vinculada a un mando: las salidas deben gobernar luces o aparatos.`})}});
   if(LG.blindFault)o.push({lv:'err',msg:'EN DIRECTO: subir y bajar activos a la vez en la persiana. ¡Motor en riesgo!'});
   return o}
@@ -150,6 +150,7 @@ function lgScene(g){const tile=(n,x,y)=>{const d=g.q['Q'+n],v=!!LG.Q['Q'+n],t=d.
 function lgInspector(g){const s=LG.sel;if(!s)return'<div class="card muted">Toca un bloque, una entrada o una salida del esquema para editarlo.</div>';
   if(/^I\d/.test(s)){const d=g.ins[s];return`<div class="card"><h3>Entrada ${s}</h3><label>Nombre</label><input value="${esc(d.n)}" style="width:100%" onchange="lgProg().ins['${s}'].n=this.value;render()"><label>Tipo</label><select onchange="lgProg().ins['${s}'].t=this.value;render()"><option value="push" ${d.t==='push'?'selected':''}>Pulsador (mientras se mantiene)</option><option value="sw" ${d.t==='sw'?'selected':''}>Interruptor (queda fijo)</option></select>${lgLinkSel(s)}</div>`}
   if(/^Q\d/.test(s)){const d=g.q[s];return`<div class="card"><h3>Salida ${s}</h3><label>Nombre</label><input value="${esc(d.n)}" style="width:100%" onchange="lgProg().q['${s}'].n=this.value;render()"><label>Dispositivo</label><select style="width:100%" onchange="lgProg().q['${s}'].t=this.value;render()">${Object.entries(LGQT).map(([k,v])=>`<option value="${k}" ${d.t===k?'selected':''}>${v}</option>`).join('')}</select><label>Potencia de la carga (kW)</label><input type="number" step="0.05" value="${d.kw}" onchange="lgProg().q['${s}'].kw=num(this.value);render()">${lgLinkSel(s)}</div>`}
+  if(/^AI\d/.test(s)){const a=g.ai[s];return`<div class="card"><h3>Entrada analógica ${s}</h3><p style="margin:0">${esc(a.n)} (${a.min}–${a.max} ${a.u})</p>${lgLinkSel(s)}</div>`}
   const b=g.blocks.find(x=>x.id===s);if(!b)return'';const def=LGT[b.t],p=b.p;let f='';
   if('T' in p)f+=`<label>Tiempo T (s)</label><input type="number" min="0.1" step="0.5" value="${p.T}" onchange="lgSetP('${b.id}','T',num(this.value,1))">`;
   if(b.t==='flash')f+=`<label>Tiempo activa (s)</label><input type="number" step="0.1" value="${p.ton}" onchange="lgSetP('${b.id}','ton',num(this.value,0.5))"><label>Tiempo inactiva (s)</label><input type="number" step="0.1" value="${p.toff}" onchange="lgSetP('${b.id}','toff',num(this.value,0.5))">`;
@@ -196,7 +197,7 @@ function lgMount(){const svg=document.getElementById('lg-svg');if(!svg)return;lg
   svg.onpointermove=e=>{if(!LG.drag||!LG.drag.id)return;const q=pt(e),b=lgProg().blocks.find(x=>x.id===LG.drag.id);b.x=Math.max(110,Math.min(780,Math.round((q.x-LG.drag.ox)/10)*10));b.y=Math.max(10,Math.min(560,Math.round((q.y-LG.drag.oy)/10)*10));lgDraw()};
   svg.onpointerup=e=>{if(LG.drag&&LG.drag.press)lgPress(LG.drag.press,0);if(LG.drag&&LG.drag.id)save();LG.drag=null;lgRefresh(true)};
   document.onkeydown=e=>{if(tab!=='logo'||/INPUT|SELECT|TEXTAREA/.test((document.activeElement||{}).tagName||''))return;if((e.key==='Delete'||e.key==='Backspace')&&LG.sel&&lgProg().blocks.some(b=>b.id===LG.sel)){e.preventDefault();lgDel(LG.sel)}};
-  if(!LG.tm)LG.tm=setInterval(()=>{if(!document.getElementById('lg-svg'))return;if(LG.run)lgStep(0.06*LG.speed);const sig=JSON.stringify([LG.I,LG.Q,LG.out,Math.floor(LG.t*4),LG.blind,LG.AI,LG.sel,LG.wire]);if(sig!==LG.sig){LG.sig=sig;lgRefresh()}},60)}
+  if(!LG.tm)LG.tm=setInterval(()=>{if(!document.getElementById('lg-svg'))return;if(LG.run){if(lgHasLinks())lgSyncAI();lgStep(0.06*LG.speed)}const sig=JSON.stringify([LG.I,LG.Q,LG.out,Math.floor(LG.t*4),LG.blind,LG.AI,LG.sel,LG.wire]);if(sig!==LG.sig){LG.sig=sig;lgRefresh()}},60)}
 function lgRefresh(force){lgDraw();const p=document.getElementById('lg-panel');if(p){const a=document.activeElement;if(!(a&&/INPUT|SELECT/.test(a.tagName)&&p.contains(a)))p.innerHTML=lgPanel()}if(force)LG.sig=''}
 // ---------- materiales ----------
 function logoBOM(proj){const g=proj&&proj.logo;if(!g||!g.blocks.length&&!Object.values(g.qin).some(Boolean))return[];const qs=Object.keys(g.qin).filter(q=>g.qin[q]),maxQ=Math.max(0,...qs.map(q=>+q.slice(1))),rows=[];
@@ -241,19 +242,22 @@ window.lgDoCheck=()=>{LG.check=lgCheck();render()};
 // ---------- vínculo con la casa ----------
 const LGIN_K=['interruptor','conmutador','cruzamiento','pulsador','regulador','detector','sensor','timbre'];
 const LGOUT_K=['luz','foco','radiador','split_i','termo','suelo','extractor','toma_horno','toma_lav','toma_lvj','toma_sec'];
+function lgAnOf(it){const g=P().logo;if(!g||!g.link)return null;for(const k of Object.keys(g.link))if(/^AI/.test(k)&&g.link[k]==='item:'+it.id)return k;return null}
+function lgBlindQ(it){const g=P().logo,r={up:null,dn:null};if(!g||!g.link)return r;Object.keys(g.link).forEach(q=>{if(g.link[q]==='bup:'+it.id)r.up=q;if(g.link[q]==='bdn:'+it.id)r.dn=q});return r}
+function lgSyncAI(){const g=P().logo;if(!g||!g.link||typeof hsVal!=='function')return;const h=HS();Object.keys(g.link).forEach(k=>{if(!/^AI/.test(k)||!g.link[k])return;const it=h.items.find(i=>'item:'+i.id===g.link[k]);if(it)LG.AI[k]=hsVal(it)})}
 function lgOutOf(it){const g=P().logo;if(!g||!g.link)return null;for(const q of Object.keys(g.link)){if(!/^Q\d/.test(q))continue;const v=g.link[q];if(!v)continue;
   if(v==='item:'+it.id)return q;if(v.startsWith('lights:')&&(it.k==='luz'||it.k==='foco')){const r=roomAt(HS(),it.x,it.y);if(r&&r.id===v.slice(7))return q}}return null}
 function lgInOf(it){const g=P().logo;if(!g||!g.link)return null;for(const k of Object.keys(g.link))if(/^I\d/.test(k)&&g.link[k]==='item:'+it.id)return k;return null}
 const lgHasLinks=()=>{const g=P().logo;return !!(g&&g.link&&Object.values(g.link).some(Boolean))};
 function lgFromHouse(it){const k=lgInOf(it);if(!k)return;const d=lgProg().ins[k];
   if(it.k==='pulsador'||it.k==='timbre'||(d&&d.t==='push')){LG.I[k]=true;setTimeout(()=>{LG.I[k]=false},450)}else LG.I[k]=!!SIMH.sw[it.id]}
-function lgHouseStep(dt){if(!lgHasLinks()||!LG.run||document.getElementById('lg-svg'))return;lgStep(dt*LG.speed)}
-function lgLinkOptions(k){const h=HS();if(/^I\d/.test(k))return h.items.filter(i=>LGIN_K.includes(i.k)).map(i=>[`item:${i.id}`,`${HI[i.k].n} · ${(roomAt(h,i.x,i.y)||{name:'fuera'}).name}`]);
+function lgHouseStep(dt){if(!lgHasLinks()||!LG.run||document.getElementById('lg-svg'))return;lgSyncAI();lgStep(dt*LG.speed)}
+function lgLinkOptions(k){const h=HS();if(/^AI/.test(k))return h.items.filter(i=>HI[i.k].an).map(i=>[`item:${i.id}`,`${HI[i.k].n} · ${(roomAt(h,i.x,i.y)||{name:'exterior'}).name}`]);if(/^I\d/.test(k))return h.items.filter(i=>LGIN_K.includes(i.k)).map(i=>[`item:${i.id}`,`${HI[i.k].n} · ${(roomAt(h,i.x,i.y)||{name:'fuera'}).name}`]);
   const o=[];h.rooms.forEach(r=>{if(h.items.some(i=>(i.k==='luz'||i.k==='foco')&&roomAt(h,i.x,i.y)===r))o.push([`lights:${r.id}`,`Todas las luces de ${r.name||RT[r.type]}`])});
-  h.items.filter(i=>LGOUT_K.includes(i.k)).forEach(i=>o.push([`item:${i.id}`,`${HI[i.k].n} · ${(roomAt(h,i.x,i.y)||{name:'fuera'}).name}`]));return o}
-window.lgSetLink=(k,v)=>{const g=lgProg();if(v)g.link[k]=v;else delete g.link[k];save();render()};
+  h.items.filter(i=>LGOUT_K.includes(i.k)||i.k==='electrovalvula').forEach(i=>o.push([`item:${i.id}`,`${HI[i.k].n} · ${(roomAt(h,i.x,i.y)||{name:'exterior'}).name}`]));h.items.filter(i=>i.k==='persiana').forEach(i=>{const n=(roomAt(h,i.x,i.y)||{name:'exterior'}).name;o.push([`bup:${i.id}`,`Persiana de ${n} · SUBIR`],[`bdn:${i.id}`,`Persiana de ${n} · BAJAR`])});return o}
+window.lgSetLink=(k,v)=>{const g=lgProg();if(v)g.link[k]=v;else delete g.link[k];if(/^Q/.test(k)&&g.q[k]){if(v&&v.startsWith('bup:'))g.q[k].t='blind_up';else if(v&&v.startsWith('bdn:'))g.q[k].t='blind_down'}save();render()};
 function lgLinkSel(k){const g=lgProg(),cur=g.link[k]||'',opts=lgLinkOptions(k);
-  return`<label>Vinculado a la casa</label><select style="width:100%" onchange="lgSetLink('${k}',this.value)"><option value="">— sin vincular —</option>${opts.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${esc(l)}</option>`).join('')}</select><p class="muted" style="font-size:12px;margin:2px 0 0">${/^I/.test(k)?'Al pulsarlo en el plano de la casa, el autómata recibe esta entrada.':'La salida del autómata gobierna este elemento de la casa.'}</p>`}
+  return`<label>Vinculado a la casa</label><select style="width:100%" onchange="lgSetLink('${k}',this.value)"><option value="">— sin vincular —</option>${opts.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${esc(l)}</option>`).join('')}</select><p class="muted" style="font-size:12px;margin:2px 0 0">${/^AI/.test(k)?'El valor del sensor del plano alimenta esta entrada analógica.':/^I/.test(k)?'Al pulsarlo en el plano de la casa, el autómata recibe esta entrada.':'La salida del autómata gobierna este elemento de la casa.'}</p>`}
 window.lgHouseDemo=()=>{const h=HS();if(!h.rooms.length)return alert('Carga antes una plantilla de casa en la pestaña «Casa (plano)».');
   const room=t=>h.rooms.find(r=>r.type===t&&h.items.some(i=>(i.k==='luz')&&roomAt(h,i.x,i.y)===r)),sal=room('salon')||h.rooms.find(r=>h.items.some(i=>i.k==='luz'&&roomAt(h,i.x,i.y)===r)),pas=room('pasillo')||h.rooms.filter(r=>h.items.some(i=>i.k==='luz'&&roomAt(h,i.x,i.y)===r))[1]||sal,ves=h.rooms.find(r=>r.type==='vestibulo')||sal;
   const mk=(k,r)=>{let it=h.items.find(i=>i.k===k&&roomAt(h,i.x,i.y)===r&&!Object.values((P().logo&&P().logo.link)||{}).includes('item:'+i.id));if(!it){const p=freeSpot(h,r,k);it={id:uid(),k,x:p.x,y:p.y};h.items.push(it)}return it};
@@ -263,4 +267,24 @@ window.lgHouseDemo=()=>{const h=HS();if(!h.rooms.length)return alert('Carga ante
   g.link={I1:'item:'+b1.id,I2:'item:'+b2.id,I3:'item:'+b3.id,Q1:'lights:'+sal.id,Q2:'lights:'+pas.id};P().logo=g;LG.st={};LG.out={};LG.I={};LG.Q={};LG.run=true;LG.speed=1;
   hsInit();CS.sim=true;tab='casa';
   SIMH.ex={t:'Casa domotizada con autómata',s:[`1. Los tres pulsadores del plano (${sal.name}, ${ves.name}, ${pas.name}) ya no encienden la luz directamente: son entradas I1, I2 e I3 del autómata.`,`2. Pulsa el del ${sal.name}: el telerruptor del autómata enciende las luces del salón (Q1). Púlsalo otra vez y se apagan.`,`3. Pulsa el del ${pas.name}: la luz del pasillo (Q2) se enciende y se apaga sola a los 15 s.`,`4. Pulsa «Apagar todo» (${ves.name}): apaga el salón y el pasillo. Mira las señales I y Q en el panel del autómata.`,'5. Cambia el cableado en la pestaña «Domótica (autómata)» y la casa responde al instante.']};
+  hsAfterEdit();render()};
+
+window.lgHouseDemo2=()=>{const h=HS();if(!h.rooms.length)return alert('Carga antes una plantilla de casa en la pestaña «Casa (plano)».');
+  const withLight=h.rooms.filter(r=>h.items.some(i=>i.k==='luz'&&roomAt(h,i.x,i.y)===r)),sal=h.rooms.find(r=>r.type==='salon')||withLight[0],pas=h.rooms.find(r=>r.type==='pasillo')||withLight[1]||sal,ter=h.rooms.find(r=>r.type==='terraza')||sal;
+  const get=(k,r,extra)=>{let it=h.items.find(i=>i.k===k&&roomAt(h,i.x,i.y)===r&&!Object.values((P().logo&&P().logo.link)||{}).some(v=>v.endsWith(':'+i.id)));if(!it){const p=freeSpot(h,r,k);it={id:uid(),k,x:p.x,y:p.y,...(extra||{})};h.items.push(it)}return it};
+  const pb1=get('pulsador',sal),pb2=get('pulsador',pas),per=get('persiana',sal),sl=get('sensor_luz',sal),st=get('sensor_temp',sal),ev=get('electrovalvula',ter),rad=get('radiador',sal);
+  if(!h.items.some(i=>i.k==='llave')){const c=h.rooms.find(r=>r.type==='cocina')||sal,p=freeSpot(h,c,'llave');h.items.push({id:uid(),k:'llave',x:p.x,y:p.y})}
+  const g=lgNew();g.ins.I1.n='Pulsador SUBIR persiana';g.ins.I2.n='Pulsador BAJAR persiana';g.ins.I3.n='Parar persiana';g.ai.AI1.n='Luz exterior (V)';g.ai.AI2.n='Temperatura (°C)';
+  g.q.Q3={n:'Persiana subir',t:'blind_up',kw:0.25};g.q.Q4={n:'Persiana bajar',t:'blind_down',kw:0.25};g.q.Q5={n:'Calefactor salón',t:'heater',kw:1.5};g.q.Q6={n:'Riego jardín',t:'pump',kw:0.02};
+  const B=(id,t,x,y,ins,p)=>({id,t,x,y,in:ins,p:p||{}});
+  g.blocks=[B('B11','cmp',60,330,['AI1'],{th:2,hy:1,mode:'<'}),B('B12','edge',230,330,['B11']),B('B13','not',60,440,['B11']),B('B14','edge',230,440,['B13']),
+    B('B15','or',400,330,['I1','B14',null]),B('B16','or',400,440,['I2','B12',null]),
+    B('B1','not',560,30,['B4']),B('B2','and',560,130,['B15','B1',null]),B('B5','or',720,30,['B16','I3','B6']),B('B3','sr',720,130,['B2','B5']),B('B6','ton',560,230,['B3'],{T:14}),
+    B('B7','not',560,330,['B3']),B('B8','and',560,430,['B16','B7',null]),B('B9','or',720,330,['B15','I3','B10']),B('B4','sr',720,430,['B8','B9']),B('B10','ton',560,530,['B4'],{T:14}),
+    B('B20','week',60,560,[],{days:[1,1,1,1,1,1,1],on:'07:00',off:'07:10'}),B('B21','cmp',230,560,['AI2'],{th:28,hy:2,mode:'<'}),B('B22','and',400,560,['B20','B21',null]),
+    B('B23','cmp',60,30,['AI2'],{th:19,hy:2,mode:'<'})];
+  g.qin={Q3:'B3',Q4:'B4',Q5:'B23',Q6:'B22'};g.nid=30;
+  g.link={I1:'item:'+pb1.id,I2:'item:'+pb2.id,AI1:'item:'+sl.id,AI2:'item:'+st.id,Q3:'bup:'+per.id,Q4:'bdn:'+per.id,Q5:'item:'+rad.id,Q6:'item:'+ev.id};
+  P().logo=g;LG.st={};LG.out={};LG.I={};LG.Q={};LG.run=true;LG.speed=1;hsInit();SIMH.val={};CS.sim=true;tab='casa';
+  SIMH.ex={t:'Casa domotizada: persiana, riego y clima',s:['1. Sensor de luz (SL): baja su valor (pulsa el sensor o usa el deslizador) y la persiana BAJA sola al anochecer; sube al amanecer.','2. Pulsadores del plano: uno sube y otro baja la persiana a mano (con enclavamiento: nunca los dos motores a la vez).','3. Sensor de temperatura (ST): por debajo de 19 °C se enciende el calefactor del salón (Q5).','4. Riego (electroválvula): se abre cada día de 07:00 a 07:10 si hace menos de 28 °C. Cambia el reloj en «Domótica (autómata)».','5. Mira las salidas en el panel y la persiana moverse en el plano y en la Casa 3D.']};
   hsAfterEdit();render()};
