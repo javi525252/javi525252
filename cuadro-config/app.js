@@ -55,7 +55,7 @@ function detach(id){const b=B();if(b.root&&b.root.id===id){const r=b.root;b.root
 function clone(n){const c=structuredClone(n);walk(c,x=>x.id=uid());return c}
 // ---------- análisis ----------
 function analyze(b){
-  const info={},issues=[],V=b.phases===3?400:230,mode=num(P().mode,4000);
+  const info={},issues=[],cables=[],V=b.phases===3?400:230,mode=num(P().mode,4000);
   const add=(lv,id,msg)=>{issues.push({lv,id,msg});if(id&&info[id]){const o=info[id];if(lv==='err'||(lv==='warn'&&o.lv!=='err'))o.lv=lv}};
   function calc(n,par,rcdUp,eq){
     const p=prod(n.pid)||{kind:'other',in:0,poles:2,icu:0,mod:1,name:'?'};
@@ -82,7 +82,12 @@ function analyze(b){
         else if(pp&&pp.in>0&&p.in>0&&pp.in/p.in<1.6&&pp.kind==='mcb'&&p.kind==='mcb')add('info',n.id,`${label(n)}: relación de calibres <1,6 con el superior; selectividad dudosa.`);}
       const need=Math.max(ib,0);
       const ampacity=Math.max(p.in,need);
-      const c=CABLES.find(c=>c[1]>=ampacity)||CABLES[CABLES.length-1];o.cable=c[2]||(c[0]+' mm²');if(c[2])o.cable=c[2]+' mm²';
+      const c=CABLES.find(c=>c[1]>=ampacity)||CABLES[CABLES.length-1];o.sec=c[0];o.cl=c[2]||String(c[0]);o.cable=o.cl+' mm²';
+      if(!n.children.length&&['mcb','rcbo'].includes(p.kind)){
+        const Vn=three?400:230,k=three?Math.sqrt(3):2;o.dv=k*Math.max(ib,0)*n.len*0.0227/c[0]/Vn*100;
+        cables.push({sec:c[0],cl:o.cl,m:eq*n.qty*n.len});
+        if(o.dv>5)add('warn',n.id,`${label(n)}: caída de tensión ${f1(o.dv)}% (>5%). Aumenta la sección o acorta la línea.`);
+        else if(o.dv>3)add('info',n.id,`${label(n)}: caída de tensión ${f1(o.dv)}% (>3%).`);}
     }
     if(['mcb','rcbo','incomer'].includes(p.kind)&&p.icu>0&&p.icu<b.isc)add('err',n.id,`${label(n)}: poder de corte ${p.icu} kA inferior a la Icc prevista (${b.isc} kA).`);
     if(['mcb'].includes(p.kind)&&!n.children.length&&!hasRcd&&p.poles<=2)add('warn',n.id,`${label(n)}: circuito final sin protección diferencial aguas arriba.`);
@@ -91,12 +96,19 @@ function analyze(b){
     if(b.phases===1&&p.poles>=4&&p.kind!=='spd'&&p.kind!=='meter')add('info',n.id,`${label(n)}: aparato tetrapolar en cuadro monofásico.`);
     return ib;
   }
-  if(!b.root){return{info,issues:[{lv:'warn',id:null,msg:'El cuadro está vacío: arrastra un aparato de cabecera.'}],mods:[],V}}
+  if(!b.root){return{info,issues:[{lv:'warn',id:null,msg:'El cuadro está vacío: arrastra un aparato de cabecera.'}],mods:[],V,cables,ph:{L1:0,L2:0,L3:0}}}
   calc(b.root,null,false,1);
+  const ph={L1:0,L2:0,L3:0};
+  if(b.phases===3){const fixed=[],auto=[];
+    walk(b.root,(n,par)=>{const i=info[n.id],pp=par&&prod(par.pid);if(par&&i.p.poles<=2&&pp&&pp.poles>=3){const l=i.ib*i.eq;
+      if(['L1','L2','L3'].includes(n.ph))ph[n.ph]+=l*n.qty;else auto.push({n,l})}});
+    auto.sort((x,y)=>y.l-x.l).forEach(a=>{for(let q=0;q<a.n.qty;q++){const m=Object.keys(ph).sort((x,y)=>ph[x]-ph[y])[0];ph[m]+=a.l}});
+    const v=Object.values(ph),mx=Math.max(...v),mn=Math.min(...v);
+    if(mx>10&&(mx-mn)>0.25*mx)add('warn',null,`Fases desequilibradas (L1 ${f1(ph.L1)} A, L2 ${f1(ph.L2)} A, L3 ${f1(ph.L3)} A). Reparte los circuitos monofásicos.`);}
   // módulos
   const mods=[];
   walk(b.root,(n)=>{const p=info[n.id]?.p;if(!p)return;let q=1;let a=n;/* qty efectiva */q=info[n.id].eq*n.qty;for(let i=0;i<q;i++)mods.push({n,p})});
-  return{info,issues,mods,V};
+  return{info,issues,mods,V,cables,ph};
 }
 const label=n=>n.label||(prod(n.pid)||{}).name||'?';
 function chooseEnc(b,mods){
@@ -109,6 +121,8 @@ function bom(proj){
   const rows={};let mods=0,encCost=0,ok=true,devCost=0;
   proj.boards.forEach(b=>{const prevB=S.projects[S.cur].cur;
     const a=analyze(b);const {enc}=chooseEnc(b,a.mods);
+    if(proj.cables!==false){const cm={};a.cables.forEach(c=>{cm[c.sec]=cm[c.sec]||{cl:c.cl,m:0};cm[c.sec].m+=c.m});
+      Object.entries(cm).forEach(([sec,c])=>{const k='cab'+sec;rows[k]=rows[k]||{p:{id:k,kind:'cable',name:`Cable Cu ${c.cl} mm² (metros)`,price:0.4+0.11*sec},qty:0};rows[k].qty+=Math.ceil(c.m)})}
     a.mods.forEach(m=>{const r=rows[m.p.id]||(rows[m.p.id]={p:m.p,qty:0});r.qty++;mods+=m.p.mod});
     const k=enc.id;rows['enc'+k]=rows['enc'+k]||{p:{name:enc.name+' (envolvente)',price:enc.price,kind:'enc',id:'enc'+k},qty:0};rows['enc'+k].qty++;
     if(a.issues.some(i=>i.lv==='err'))ok=false;
@@ -131,9 +145,9 @@ function render(){
   const proj=P();
   $('#proj').innerHTML=S.projects.map((p,i)=>`<option value="${i}" ${i===S.cur?'selected':''}>${esc(p.name)}</option>`).join('');
   $('#proj').onchange=e=>{S.cur=+e.target.value;selId=null;render()};
-  const tabs=[['design','Diseño'],['diagram','Esquema unifilar'],['encl','Envolvente'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['report','Informe'],['project','Proyecto']];
+  const tabs=[['design','Diseño'],['diagram','Esquema unifilar'],['encl','Envolvente'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
   $('#nav').innerHTML=tabs.map(([k,n])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
-  const f={design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,project:vProject}[tab];
+  const f={design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,project:vProject}[tab];
   $('#app').innerHTML=boardBar()+f();
   if(tab==='design')wireDnD();
 }
@@ -161,12 +175,12 @@ function vDesign(){
    <p class="muted" style="font-size:12px">Arrastra al árbol, o doble clic para añadir bajo el elemento seleccionado.</p>
    <div class="pal">${list.map(p=>`<div class="pi" draggable="true" data-p="${p.id}" ondblclick="addTo('${p.id}')">${esc(p.name)}<br><small>${p.icu?p.icu+' kA · ':''}${p.mod} mód. · ${eur(p.price)}</small></div>`).join('')}</div></div>`;
   const treeHtml=b.root?`<ul class="tree root">${nodeHtml(b.root,a,sel)}</ul>`:`<div class="drop" data-root="1">Arrastra aquí el aparato de cabecera</div>`;
-  const tpl=`<div class="bar"><span class="muted">Plantillas:</span><button class="b s" onclick="applyTpl('vivienda')">Vivienda</button><button class="b s" onclick="applyTpl('local')">Local trifásico</button><button class="b s" onclick="clearBoard()">Vaciar</button></div>`;
+  const tpl=`<div class="bar"><span class="muted">Plantillas:</span><button class="b s" onclick="applyTpl('vivienda')">Vivienda</button><button class="b s" onclick="applyTpl('local')">Local trifásico</button><button class="b s" onclick="clearBoard()">Vaciar</button><span style="flex:1"></span><button class="b" onclick="fixSizes()">Corregir calibres insuficientes</button></div>`;
   const center=`<div class="card"><h3>${esc(b.name)} — red eléctrica</h3>${tpl}${treeHtml}</div>`;
   const nErr=a.issues.filter(i=>i.lv==='err').length,nW=a.issues.filter(i=>i.lv==='warn').length;
   const tot=a.mods.reduce((s,m)=>s+m.p.mod,0),ce=chooseEnc(b,a.mods);
   const rootIb=b.root?a.info[b.root.id].ib:0;
-  const kpi=`<div class="kpi"><div><b>${f1(rootIb)} A</b>Intensidad total</div><div><b>${f1(rootIb*a.V*(b.phases===3?Math.sqrt(3):1)*0.9/1000)} kW</b>Potencia aprox.</div><div><b>${tot} mód.</b>${esc(ce.enc.name)}</div><div><b style="color:${nErr?'var(--er)':'var(--ok)'}">${nErr} err · ${nW} av.</b>Verificación</div></div>`;
+  const kpi=`<div class="kpi"><div><b>${f1(rootIb)} A</b>Intensidad total</div><div><b>${f1(rootIb*a.V*(b.phases===3?Math.sqrt(3):1)*0.9/1000)} kW</b>Potencia aprox.</div><div><b>${tot} mód.</b>${esc(ce.enc.name)}</div>${b.phases===3&&b.root?`<div><b>${f1(a.ph.L1)} / ${f1(a.ph.L2)} / ${f1(a.ph.L3)} A</b>Fases L1 / L2 / L3</div>`:''}<div><b style="color:${nErr?'var(--er)':'var(--ok)'}">${nErr} err · ${nW} av.</b>Verificación</div></div>`;
   const insp=sel?inspector(find(sel).n,a):boardProps(b);
   const checks=`<div class="card"><h3>Verificaciones</h3>${a.issues.length?a.issues.map(i=>`<div class="chk ${i.lv}" ${i.id?`onclick="selId='${i.id}';render()" style="cursor:pointer"`:''}>${esc(i.msg)}</div>`).join(''):'<div class="chk ok">Sin incidencias. El cuadro cumple las comprobaciones.</div>'}</div>`;
   return`<div class="card">${kpi}</div><div class="grid g3">${pal}${center}<div>${insp}${checks}</div></div>`;
@@ -178,6 +192,7 @@ function nodeHtml(n,a,sel){
    <small class="muted">${p.in?p.in+'A ':''}${p.poles?p.poles+'P':''}${n.qty>1?' ×'+n.qty:''} · Ib ${f1(i.ib)}A${n.kw&&!n.children.length?' · '+n.kw+'kW':''}</small></span>
    ${n.children.length?`<ul class="tree">${n.children.map(c=>nodeHtml(c,a,sel)).join('')}</ul>`:''}</li>`;
 }
+const b0=()=>B();
 function inspector(n,a){
   const i=a.info[n.id],p=i.p;
   const same=S.catalog.filter(x=>x.kind===p.kind&&x.poles===p.poles).sort((x,y)=>x.in-y.in);
@@ -189,6 +204,8 @@ function inspector(n,a){
    ${n.children.length?'':`<div><label>Potencia por circuito (kW)</label><input type="number" step="0.1" min="0" value="${n.kw}" onchange="upd('kw',num(this.value))"></div>
    <div><label>cos φ</label><input type="number" step="0.01" min="0.1" max="1" value="${n.pf}" onchange="upd('pf',num(this.value,0.9))"></div>`}
    <div><label>Longitud línea (m)</label><input type="number" min="0" value="${n.len}" onchange="upd('len',num(this.value))"></div></div>
+  ${b0().phases===3&&p.poles<=2?`<label>Fase</label><select onchange="upd('ph',this.value)"><option value="">Automática</option>${['L1','L2','L3'].map(f=>`<option ${n.ph===f?'selected':''}>${f}</option>`).join('')}</select>`:''}
+  ${i.dv!=null?`<p style="margin:6px 0 0">Caída de tensión: <b>${f1(i.dv)}%</b></p>`:''}
   <p style="margin:8px 0 2px">Intensidad de cálculo: <b>${f1(i.ib)} A</b>${i.cable?` · Cable orientativo: <b>${i.cable}</b> (Cu, ref. B1)`:''}</p>
   <div class="bar"><button class="b s" onclick="dupNode()">Duplicar</button><button class="b d" onclick="delNode()">Eliminar</button></div></div>`;
 }
@@ -316,3 +333,27 @@ function vReport(){
   <p class="muted" style="font-size:12px">Cálculos orientativos. Verificar por técnico competente conforme al REBT/IEC 61439 antes de fabricar o instalar.</p></div>`;
 }
 S=load();render();
+
+// ---------- corrección automática de calibres ----------
+window.fixSizes=()=>{const b=B();if(!b.root)return;const a=analyze(b);let n=0,fail=0;
+  walk(b.root,x=>{const i=a.info[x.id],p=i.p;if(p.in>0&&i.ib>p.in&&['mcb','rcd','rcbo','incomer'].includes(p.kind)){
+    const c=S.catalog.filter(q=>q.kind===p.kind&&q.poles===p.poles&&(q.ma||0)===(p.ma||0)&&q.in>=i.ib&&q.icu>=Math.min(p.icu,b.isc)).sort((u,v)=>u.in-v.in)[0];
+    if(c){x.pid=c.id;n++}else fail++}});
+  alert(n?`Se han corregido ${n} aparato(s).`+(fail?` ${fail} sin alternativa en el catálogo.`:''):(fail?`${fail} aparato(s) sin alternativa en el catálogo.`:'No hay calibres insuficientes.'));render()};
+// ---------- deshacer / rehacer ----------
+let hist=[],hi=-1,restoring=false;
+function snap(){const j=JSON.stringify(S);if(restoring||hist[hi]===j)return;hist=hist.slice(0,hi+1);hist.push(j);if(hist.length>60)hist.shift();hi=hist.length-1}
+window.undo=()=>{if(hi<=0)return;hi--;restoring=true;S=JSON.parse(hist[hi]);selId=null;render();restoring=false};
+window.redo=()=>{if(hi>=hist.length-1)return;hi++;restoring=true;S=JSON.parse(hist[hi]);selId=null;render();restoring=false};
+document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;
+  if(e.key==='z'){e.preventDefault();undo()}else if(e.key==='y'){e.preventDefault();redo()}});
+const _render=render;render=function(){snap();_render()};
+snap();
+// ---------- etiquetas ----------
+function vLabels(){
+  const b=B(),a=analyze(b),items=[];
+  if(b.root)walk(b.root,(n)=>{const i=a.info[n.id];if(i.p.in>0||['spd','meter'].includes(i.p.kind))for(let q=0;q<n.qty;q++)items.push({n,i,q})});
+  return`<div class="card"><h3>Etiquetas de circuitos — ${esc(b.name)}</h3><div class="bar noprint"><button class="b" onclick="window.print()">Imprimir etiquetas</button></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px">
+  ${items.map(({n,i,q})=>`<div style="border:1.5px solid #333;border-radius:4px;padding:6px 8px"><b>${esc(label(n))}${n.qty>1?' '+(q+1):''}</b><br><span style="font-size:12px">${i.p.in?i.p.in+' A · ':''}${i.p.poles}P${i.p.ma?' · '+i.p.ma+' mA':''}${i.cable&&!n.children.length?' · '+i.cable:''}</span></div>`).join('')}</div></div>`;
+}
