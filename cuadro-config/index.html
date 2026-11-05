@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CuadroConfig</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#1d2733;--mu:#6b7785;--pr:#0b7a4b;--pr2:#e3f4ec;--bd:#d9dfe5;--er:#c62828;--wa:#e08a00;--ok:#2e7d32;--in:#1565c0}
+*{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:#0f2a3d;color:#fff;padding:8px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;margin:0}header h1 span{color:#5fe3a1}
+header input,header select{padding:5px 8px;border-radius:5px;border:0}
+nav{display:flex;gap:2px;background:#16384f;padding:0 12px;flex-wrap:wrap}
+nav button{background:none;border:0;color:#bcd;padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:3px solid transparent}
+nav button.on{color:#fff;border-color:#5fe3a1}
+main{padding:14px;max-width:1500px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:12px}
+.card h3{margin:0 0 8px;font-size:15px}
+.grid{display:grid;gap:12px}.g3{grid-template-columns:260px 1fr 330px}.g2{grid-template-columns:1fr 1fr}
+@media(max-width:1000px){.g3,.g2{grid-template-columns:1fr}}
+button.b,.btn{background:var(--pr);color:#fff;border:0;border-radius:5px;padding:6px 11px;cursor:pointer;font-size:13px}
+button.s{background:#e8edf1;color:var(--tx)}button.d{background:var(--er)}
+input,select{font:inherit;padding:5px 7px;border:1px solid var(--bd);border-radius:5px;max-width:100%}
+label{display:block;font-size:12px;color:var(--mu);margin:6px 0 2px}
+table{border-collapse:collapse;width:100%}th,td{padding:5px 7px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:middle}
+th{font-size:12px;color:var(--mu);background:#fafbfc}td.r,th.r{text-align:right}
+.bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.pal{max-height:68vh;overflow:auto}
+.pi{padding:5px 7px;border:1px solid var(--bd);border-radius:5px;margin:3px 0;cursor:grab;background:#fff;font-size:12.5px}
+.pi:hover{background:var(--pr2)}.pi small{color:var(--mu)}
+ul.tree{list-style:none;margin:0;padding-left:20px;border-left:1px dashed var(--bd)}ul.tree.root{padding-left:0;border:0}
+.nd{display:inline-flex;gap:8px;align-items:center;padding:4px 8px;border:1px solid var(--bd);border-radius:6px;background:#fff;margin:3px 0;cursor:grab}
+.nd.sel{outline:2px solid var(--pr);background:var(--pr2)}.nd.over{outline:2px dashed var(--in)}
+.nd.err{border-color:var(--er)}.nd.warn{border-color:var(--wa)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--ok)}.dot.err{background:var(--er)}.dot.warn{background:var(--wa)}
+.drop{border:2px dashed var(--bd);border-radius:8px;padding:18px;text-align:center;color:var(--mu)}
+.chk{padding:5px 8px;border-left:4px solid;margin:4px 0;background:#fafbfc;font-size:12.5px}
+.chk.err{border-color:var(--er)}.chk.warn{border-color:var(--wa)}.chk.info{border-color:var(--in)}.chk.ok{border-color:var(--ok)}
+.kpi{display:flex;gap:10px;flex-wrap:wrap}.kpi div{background:var(--pr2);border-radius:8px;padding:8px 14px}.kpi b{display:block;font-size:18px}
+svg text{font:11px system-ui}.muted{color:var(--mu)}
+.tot td{font-weight:600;background:#fafbfc}
+@media print{header,nav,.noprint{display:none!important}body{background:#fff}.card{border:0;break-inside:avoid}}
+</style></head><body>
+<header><h1>Cuadro<span>Config</span></h1>
+<span class="muted" style="color:#9bb">Diseño y presupuesto de cuadros eléctricos</span>
+<span style="flex:1"></span>
+<select id="proj" title="Proyecto"></select>
+<button class="b s" onclick="newProject()">+ Proyecto</button>
+<button class="b s" onclick="delProject()">Eliminar</button>
+<button class="b s" onclick="exportJSON()">Exportar</button>
+<button class="b s" onclick="document.getElementById('imp').click()">Importar</button>
+<input type="file" id="imp" accept=".json" hidden onchange="importJSON(this)">
+</header>
+<nav id="nav"></nav>
+<main id="app"></main>
+<script src="catalog.js"></script>
+<script src="app.js"></script>
+</body></html>
