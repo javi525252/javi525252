@@ -82,7 +82,9 @@ function analyze(b){
         else if(pp&&pp.in>0&&p.in>0&&pp.in/p.in<1.6&&pp.kind==='mcb'&&p.kind==='mcb')add('info',n.id,`${label(n)}: relación de calibres <1,6 con el superior; selectividad dudosa.`);}
       const need=Math.max(ib,0);
       const ampacity=Math.max(p.in,need);
-      const c=CABLES.find(c=>c[1]>=ampacity)||CABLES[CABLES.length-1];o.sec=c[0];o.cl=c[2]||String(c[0]);o.cable=o.cl+' mm²';
+      let c=CABLES.find(c=>c[1]>=ampacity)||CABLES[CABLES.length-1];
+      if(n.sec){const m=CABLES.find(x=>x[0]===n.sec);if(m){c=m;if(m[1]<p.in)add('err',n.id,`${label(n)}: cable de ${m[2]||m[0]} mm² admite ${m[1]} A y la protección es de ${p.in} A: el cable queda sin proteger.`)}}
+      o.amp=c[1];o.sec=c[0];o.cl=c[2]||String(c[0]);o.cable=o.cl+' mm²';
       if(!n.children.length&&['mcb','rcbo'].includes(p.kind)){
         const Vn=three?400:230,k=three?Math.sqrt(3):2;o.dv=k*Math.max(ib,0)*n.len*0.0227/c[0]/Vn*100;
         cables.push({sec:c[0],cl:o.cl,m:eq*n.qty*n.len});
@@ -101,8 +103,8 @@ function analyze(b){
   const ph={L1:0,L2:0,L3:0};
   if(b.phases===3){const fixed=[],auto=[];
     walk(b.root,(n,par)=>{const i=info[n.id],pp=par&&prod(par.pid);if(par&&i.p.poles<=2&&pp&&pp.poles>=3){const l=i.ib*i.eq;
-      if(['L1','L2','L3'].includes(n.ph))ph[n.ph]+=l*n.qty;else auto.push({n,l})}});
-    auto.sort((x,y)=>y.l-x.l).forEach(a=>{for(let q=0;q<a.n.qty;q++){const m=Object.keys(ph).sort((x,y)=>ph[x]-ph[y])[0];ph[m]+=a.l}});
+      if(['L1','L2','L3'].includes(n.ph)){ph[n.ph]+=l*n.qty;i.phase=n.ph}else auto.push({n,l})}});
+    auto.sort((x,y)=>y.l-x.l).forEach(a=>{for(let q=0;q<a.n.qty;q++){const m=Object.keys(ph).sort((x,y)=>ph[x]-ph[y])[0];ph[m]+=a.l;if(!info[a.n.id].phase)info[a.n.id].phase=m}});
     const v=Object.values(ph),mx=Math.max(...v),mn=Math.min(...v);
     if(mx>10&&(mx-mn)>0.25*mx)add('warn',null,`Fases desequilibradas (L1 ${f1(ph.L1)} A, L2 ${f1(ph.L2)} A, L3 ${f1(ph.L3)} A). Reparte los circuitos monofásicos.`);}
   // módulos
@@ -145,11 +147,12 @@ function render(){
   const proj=P();
   $('#proj').innerHTML=S.projects.map((p,i)=>`<option value="${i}" ${i===S.cur?'selected':''}>${esc(p.name)}</option>`).join('');
   $('#proj').onchange=e=>{S.cur=+e.target.value;selId=null;render()};
-  const tabs=[['design','Diseño'],['diagram','Esquema unifilar'],['encl','Envolvente'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
+  const tabs=[['design','Diseño'],['diagram','Esquema unifilar'],['encl','Envolvente'],['m3d','Montaje 3D'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
   $('#nav').innerHTML=tabs.map(([k,n])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
-  const f={design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,project:vProject}[tab];
+  const f={design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,m3d:vM3D,project:vProject}[tab];
   $('#app').innerHTML=boardBar()+f();
   if(tab==='design')wireDnD();
+  if(tab==='m3d')M3D.mount();
 }
 window.go=t=>{tab=t;render()};
 function boardBar(){
@@ -205,6 +208,7 @@ function inspector(n,a){
    <div><label>cos φ</label><input type="number" step="0.01" min="0.1" max="1" value="${n.pf}" onchange="upd('pf',num(this.value,0.9))"></div>`}
    <div><label>Longitud línea (m)</label><input type="number" min="0" value="${n.len}" onchange="upd('len',num(this.value))"></div></div>
   ${b0().phases===3&&p.poles<=2?`<label>Fase</label><select onchange="upd('ph',this.value)"><option value="">Automática</option>${['L1','L2','L3'].map(f=>`<option ${n.ph===f?'selected':''}>${f}</option>`).join('')}</select>`:''}
+  ${i.cable?`<label>Sección de cable (mm²)</label><select onchange="upd('sec',this.value?num(this.value):0)"><option value="">Automática (${i.cl})</option>${CABLES.map(c=>`<option value="${c[0]}" ${n.sec===c[0]?'selected':''}>${c[2]||c[0]} (${c[1]} A)</option>`).join('')}</select>`:''}
   ${i.dv!=null?`<p style="margin:6px 0 0">Caída de tensión: <b>${f1(i.dv)}%</b></p>`:''}
   <p style="margin:8px 0 2px">Intensidad de cálculo: <b>${f1(i.ib)} A</b>${i.cable?` · Cable orientativo: <b>${i.cable}</b> (Cu, ref. B1)`:''}</p>
   <div class="bar"><button class="b s" onclick="dupNode()">Duplicar</button><button class="b d" onclick="delNode()">Eliminar</button></div></div>`;
@@ -356,4 +360,19 @@ function vLabels(){
   return`<div class="card"><h3>Etiquetas de circuitos — ${esc(b.name)}</h3><div class="bar noprint"><button class="b" onclick="window.print()">Imprimir etiquetas</button></div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px">
   ${items.map(({n,i,q})=>`<div style="border:1.5px solid #333;border-radius:4px;padding:6px 8px"><b>${esc(label(n))}${n.qty>1?' '+(q+1):''}</b><br><span style="font-size:12px">${i.p.in?i.p.in+' A · ':''}${i.p.poles}P${i.p.ma?' · '+i.p.ma+' mA':''}${i.cable&&!n.children.length?' · '+i.cable:''}</span></div>`).join('')}</div></div>`;
+}
+
+// ---------- hoja de montaje (orden, calibre, sección) ----------
+const PHC={L1:'marrón',L2:'negro',L3:'gris'};
+function condText(i){const p=i.p;if(p.poles>=3)return 'L1 marrón, L2 negro, L3 gris'+(p.poles>=4?', N azul':'')+', PE verde-amarillo';return (PHC[i.phase||'L1'])+' ('+(i.phase||'L1')+'), N azul, PE verde-amarillo'}
+function orderList(b){const a=analyze(b),rows=[];let k=0;
+  walk(b.root,(n,par,d)=>{const i=a.info[n.id];k++;rows.push({ord:k,n,par,d,i,p:i.p})});return{rows,a}}
+function vM3D(){
+  return`<div class="bar noprint"><button class="b ${M3D.mode==='build'?'':'s'}" onclick="M3D.setMode('build')">1 · Montaje</button><button class="b ${M3D.mode==='demo'?'':'s'}" onclick="M3D.setMode('demo')">2 · Demostración y fallos</button>
+  <label style="margin:0 0 0 10px"><input type="checkbox" id="m-door" onchange="M3D.door(this.checked)"> Puerta</label>
+  <button class="b s" onclick="M3D.auto()">Montaje automático</button><button class="b s" onclick="M3D.clear()">Vaciar carril</button><button class="b s" onclick="M3D.resetCam()">Cámara</button></div>
+  <div class="grid g3"><div class="card" id="m-left" style="max-height:72vh;overflow:auto"></div>
+  <div class="card m-center" style="padding:0;overflow:hidden;align-self:start"><div id="m-wrap" style="position:relative;height:62vh;min-height:380px;background:#cfd8de"><canvas id="m-cv" style="width:100%;height:100%;display:block;touch-action:none"></canvas>
+  <div id="m-banner" style="position:absolute;left:8px;right:8px;top:8px;pointer-events:none"></div><div id="m-hint" style="position:absolute;left:8px;bottom:6px;font-size:12px;color:#334;background:#fffc;padding:3px 7px;border-radius:5px"></div></div></div>
+  <div id="m-right" style="max-height:72vh;overflow:auto"></div></div>`;
 }
