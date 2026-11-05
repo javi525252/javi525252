@@ -47,3 +47,7 @@ Plantillas: piso de 3 dormitorios, estudio y piso con climatización y gas. «Eq
 
 ## Simulación de la casa
 En «Casa (plano)» pulsa **▶ Simular funcionamiento**: pulsa interruptores (se encienden las luces del circuito C1), enchufa aparatos en las tomas (suben los amperios y puede saltar C2), abre grifos, enciende la cocina de gas o el termo. Hay 6 ejemplos guiados (luz, sobrecarga, cortocircuito, fuga a tierra, ducha con termo apagado, cocina de gas) y se ve qué protección salta y qué circuitos se quedan sin tensión. La misma simulación funciona en «Casa 3D».
+
+## Mecanismos y domótica con autómata (tipo LOGO!)
+- **Poner y quitar mecanismos en plena demostración:** interruptor, conmutador (luz desde 2 puntos), conmutador de cruce (3 o más puntos), pulsador con telerruptor, regulador de luz, detector de presencia, timbre, enchufes, luces y focos. Si quitas el último interruptor, la luz queda siempre encendida.
+- **Pestaña «Domótica (autómata)»:** editor de esquema de funciones (Y, O, NO, SR, telerruptor, temporizadores, intermitente, contador, comparador analógico, reloj semanal), simulador en vivo, pantalla del autómata, entradas pulsables y escena de la casa (luces, persiana con enclavamiento, calefactor, riego, sirena, cerradura). Incluye 8 programas de ejemplo y validación de relés/contactores y materiales en el presupuesto.

@@ -39,6 +39,7 @@ svg text{font:11px system-ui}.muted{color:var(--mu)}
 @media(max-width:1000px){.m-center{order:-1}}
 .gc{display:grid;gap:12px;grid-template-columns:1fr 370px}.gc.wide{grid-template-columns:1fr}@media(max-width:1000px){.gc{grid-template-columns:1fr}}
 .flow{stroke-dasharray:16 12;animation:fl .7s linear infinite}@keyframes fl{to{stroke-dashoffset:-28}}
+.spin{transform-box:fill-box;transform-origin:center;animation:sp .6s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
 .pulse{animation:pl 1s ease-in-out infinite}@keyframes pl{50%{opacity:.35}}.drip{animation:dr .9s linear infinite}@keyframes dr{from{transform:translateY(-10px);opacity:1}to{transform:translateY(16px);opacity:0}}
 .chip{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--bd);border-radius:16px;background:#fff;cursor:pointer;font-size:12.5px}.chip.on{outline:2px solid var(--pr);background:var(--pr2)}
 @media print{header,nav,.noprint{display:none!important}body{background:#fff}.card{border:0;break-inside:avoid}}
@@ -62,5 +63,6 @@ svg text{font:11px system-ui}.muted{color:var(--mu)}
 <script src="casa.js"></script>
 <script src="casa-sim.js"></script>
 <script src="casa-ui.js"></script>
+<script src="logo.js"></script>
 <script src="app.js"></script>
 </body></html>

@@ -7,6 +7,8 @@ const RCOL={salon:'#fff3d6',dormitorio:'#e3f0ff',cocina:'#ffe5d9',bano:'#d9f4f1'
 const HI={
   luz:{cat:'ele',n:'Punto de luz',ab:'L',kw:0.1,circ:'C1',hz:250,pr:4.5},foco:{cat:'ele',n:'Foco empotrado',ab:'F',kw:0.02,circ:'C1',hz:250,pr:6},
   interruptor:{cat:'ele',n:'Interruptor',ab:'I',hz:110,pr:5,sw:1},conmutador:{cat:'ele',n:'Conmutador',ab:'Cm',hz:110,pr:6.5,sw:1},
+  cruzamiento:{cat:'ele',n:'Conmutador de cruce',ab:'Cx',hz:110,pr:9,sw:1},pulsador:{cat:'ele',n:'Pulsador (telerruptor)',ab:'P',hz:110,pr:7,sw:1},
+  regulador:{cat:'ele',n:'Regulador de luz (dimmer)',ab:'RG',hz:110,pr:28,sw:1},detector:{cat:'ele',n:'Detector de presencia',ab:'DP',hz:230,pr:32,sw:1},timbre:{cat:'ele',n:'Pulsador de timbre',ab:'TB',hz:130,pr:12},
   toma:{cat:'ele',n:'Toma 16 A uso general',ab:'T',circ:'C2',hz:30,pr:6.5},toma_ext:{cat:'ele',n:'Toma exterior',ab:'TE',circ:'C2',hz:40,pr:14},
   toma_bano:{cat:'ele',n:'Toma de baño',ab:'TB',circ:'C5',hz:110,pr:8},toma_enc:{cat:'ele',n:'Toma encimera cocina',ab:'TC',circ:'C5',hz:110,pr:8},
   toma_horno:{cat:'ele',n:'Toma cocina/horno 25 A',ab:'TH',kw:4.5,circ:'C3',hz:60,pr:14},toma_lav:{cat:'ele',n:'Toma lavadora',ab:'TL',kw:2.2,circ:'C4',hz:100,pr:8},
@@ -111,7 +113,7 @@ function houseIssues(h,C){
     Object.entries(need).forEach(([k,n])=>{const c=countIn(h,r,k);if(c<n){const cat=k==='tv'||k==='rj45'?'tel':'ele',nmk=k==='luz'?'puntos de luz':HI[k].n.toLowerCase();bad('warn',cat,null,`${lab}: faltan elementos (${c}/${n} ${nmk}) según ITC-BT-25${cat==='tel'?' / ICT':''}.`)}});
     if(countIn(h,r,'luz')>0&&countIn(h,r,'int')===0)bad('warn','ele',null,`${lab}: tiene luz pero ningún interruptor.`)});
   const wet=h.items.filter(i=>HI[i.k].wet);
-  h.items.filter(i=>['toma','toma_bano','interruptor','conmutador','toma_enc'].includes(i.k)&&(roomOf(i)||{}).type==='bano').forEach(i=>{const w=wet.find(x=>hdist(x,i)<60);if(w)bad('err','ele',i.id,`${nm(i)} a ${Math.round(hdist(w,i))} cm de ${HI[w.k].n.toLowerCase()}: dentro del volumen de seguridad del baño (mín. 60 cm, ITC-BT-27).`)});
+  h.items.filter(i=>(['toma','toma_bano','toma_enc'].includes(i.k)||HI[i.k].sw)&&(roomOf(i)||{}).type==='bano').forEach(i=>{const w=wet.find(x=>hdist(x,i)<60);if(w)bad('err','ele',i.id,`${nm(i)} a ${Math.round(hdist(w,i))} cm de ${HI[w.k].n.toLowerCase()}: dentro del volumen de seguridad del baño (mín. 60 cm, ITC-BT-27).`)});
   Object.values(C.circ).forEach(c=>{const def=c.def;
     if(def.maxPts&&c.pts>def.maxPts)bad('err','ele',null,`${c.code} ${def.n}: ${c.pts} puntos, máximo ${def.maxPts}. Reparte en otro circuito.`);
     if(c.code==='C4'&&c.raw>def.max)bad('info','ele',null,`C4: lavadora + lavavajillas + termo suman ${c.raw.toFixed(1)} kW; el circuito (${def.In} A) no los aguanta a la vez.`);

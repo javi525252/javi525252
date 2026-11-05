@@ -36,6 +36,7 @@ function phaseOf(C,it){let n=it.n;while(n){const i=C.a.info[n.id];if(i&&i.phase)
 // ---------- interfaz pública ----------
 M.setMode=m=>{if(M.view==='casa')m='demo';M.mode=m;M.ui.carry=null;rebuild();panels();const b=M.sim&&M.sim.banner;banner(m==='demo'&&b?b.txt:'',b?b.lv:'')};
 M.setView=v=>{M.view=v;if(v==='casa'){M.mode='demo';hsInit()}M.ui.carry=null;M.ui.item=null;if(M.R){M.resetCam();rebuild()}panels()};
+M.refreshCasa=()=>{if(M.R&&M.view==='casa'){rebuild();panels()}};
 M.door=v=>{M.door_=v;if(M.R&&M.R.doorG)M.R.doorG.visible=v};
 M.resetCam=()=>{const R=M.R;if(!R)return;const C=M.C;
   if(M.view==='casa'){const h=HS(),W=h.w,D=h.h;R.dim={W,D};R.cam={th:0.3,ph:0.95,r:Math.max(W,D)*1.3,t:new THREE.Vector3(W/2,30,D/2)}}
@@ -275,9 +276,14 @@ function mkHouseItem(it,d,room,H){
     if(c.plug){plugBox=wm(8,10,8,0xff9800,0,-8,6);plugTag=mkText(PLUGS[c.plug].n);plugTag.scale.set(26,4,1);plugTag.position.set(0,-18,6);g.add(plugTag)}}
     if(plugBox)plugBox.material.emissive.setHex(c.live?0x884400:0)};
   if(k==='luz'){wall=false;cyl(13,13,4,0xeeeeee,0,248,0,g);const b=new THREE.Mesh(new THREE.SphereGeometry(6,12,10),new THREE.MeshBasicMaterial({color:0x666666}));b.position.y=243;g.add(b);const gl=glow(75,238);
-    upd=c=>{b.material.color.setHex(c.lit?0xfff2a8:0x666666);gl.visible=!!c.lit}}
+    upd=c=>{b.material.color.setHex(c.lit?0xfff2a8:0x666666);gl.visible=!!c.lit;const z=75*(c.br||1);gl.scale.set(z,z,1)}}
   else if(k==='foco'){wall=false;const b=new THREE.Mesh(new THREE.CylinderGeometry(5,5,1.5,12),new THREE.MeshBasicMaterial({color:0x777777}));b.position.y=249;g.add(b);const gl=glow(55,246);upd=c=>{b.material.color.setHex(c.lit?0xfff2a8:0x777777);gl.visible=!!c.lit}}
   else if(k==='extractor'){wall=false;cyl(14,14,6,0xdddddd,0,247,0,g);const f=wm(22,1,3,0x999999,0,244,0);upd=c=>{if(c.run&&c.live)f.rotation.y+=c.dt*12}}
+  else if(k==='cruzamiento'){wm(8,12,1.6,0xf5f5f5,0,0,0.8);const lv=wm(4,6,1.2,0xdddddd,0,0,1.8);const x1=wm(1,6,0.5,0x333333,0,-4,1.7);upd=c=>{lv.rotation.x=c.sw?-0.45:0.45}}
+  else if(k==='pulsador'){wm(8,8,1.6,0xf5f5f5,0,0,0.8);cyl(2.4,2.4,1.4,0xdddddd,0,0,2,g,'z',14);const l=led(0,5,1.9,0.6);upd=c=>l.material.color.setHex(c.latch?0x25d366:0x888888)}
+  else if(k==='regulador'){wm(8,8,1.6,0xf5f5f5,0,0,0.8);const kn=cyl(2.8,2.8,1.8,0xcccccc,0,0,2.2,g,'z',16);const mk=wm(0.6,2.6,0.4,0x222222,0,1.4,3.1);upd=c=>{mk.rotation.z=-(((c.sw?(c.dimv||100):0)/100)*4.2-2.1)}}
+  else if(k==='detector'){wall=false;cyl(10,12,3,0xf5f5f5,0,248,0,g);const l=led(0,246,5,1);upd=c=>l.material.color.setHex(c.sw?0xff3030:0x888888)}
+  else if(k==='timbre'){wm(8,10,1.6,0xf5f5f5,0,0,0.8);const bl=cyl(3,3,1,0xe0b400,0,0,2,g,'z',14);const rg=glow(40,0,0xffcc00);upd=c=>{rg.visible=!!c.ring;bl.rotation.z=c.ring?Math.sin(c.t*30)*0.3:0}}
   else if(k==='interruptor'||k==='conmutador'){wm(8,12,1.6,0xf5f5f5,0,0,0.8);const lv=wm(4,6,1.2,0xdddddd,0,0,1.8);const l=led(0,5.5,1.8,0.6);upd=c=>{lv.rotation.x=c.sw?-0.45:0.45;l.material.color.setHex(c.sw?0x25d366:0x888888)}}
   else if(k.startsWith('toma')){wm(9,9,1.6,0xf5f5f5,0,0,0.8);[-1.7,1.7].forEach(x=>cyl(0.8,0.8,0.5,0x222222,x,0,1.7,g,'z',8));const l=led(0,4,1.9,0.5);upd=c=>{l.material.color.setHex(c.live?0x25d366:0x888888);if(PLUGGABLE.includes(k))plugVis(c);else if(RUNNABLE.includes(k)){if(c.run&&!plugBox){plugBox=wm(10,10,8,0xff9800,0,-8,6)}if(!c.run&&plugBox){g.remove(plugBox);plugBox=null}if(plugBox)plugBox.material.emissive.setHex(c.live?0x884400:0)}}}
   else if(k==='tv'||k==='rj45'){wm(8,8,1.6,0xeaeaea,0,0,0.8);cyl(1.3,1.3,1,k==='tv'?0x7e57c2:0x00acc1,0,0,1.8,g,'z',10)}
@@ -353,7 +359,7 @@ function visuals(t,dt){
     d.userData.led.material.color.setHex(col);
     d.userData.body.material.color.setHex(st.destroyed?0x3a3330:sel?0xbfe8d0:0xd3d9de);
     if(S.fault&&S.fault.id===it.n.id)d.userData.led.scale.setScalar(1+0.6*Math.abs(Math.sin(t*10)))});
-  if(R.hitems&&SIMH.m)R.hitems.forEach(hi=>{const live=hsLive(hi.circ),m=SIMH.m;hi.upd({live,t,dt,run:!!SIMH.run[hi.id],plug:SIMH.plug[hi.id]||'',sw:!!SIMH.sw[hi.id],lit:(hi.k==='luz'||hi.k==='foco')?(live&&lightOn(m,hi.item)):false,anyTrip:Object.keys(SIMH.trip).some(k=>SIMH.trip[k]),on:SIMH.main,ext:()=>m.h.items.some(i=>i.k==='split_i'&&SIMH.run[i.id]&&hsLive(itemCode(m,i)))})});
+  if(R.hitems&&SIMH.m)R.hitems.forEach(hi=>{const live=hsLive(hi.circ),m=SIMH.m;hi.upd({live,t,dt,run:!!SIMH.run[hi.id],plug:SIMH.plug[hi.id]||'',sw:!!SIMH.sw[hi.id],lit:(hi.k==='luz'||hi.k==='foco')?(live&&lightOn(m,hi.item)):false,br:(hi.k==='luz'||hi.k==='foco')?brightness(m,hi.item):1,latch:!!SIMH.latch[(roomAt(m.h,hi.item.x,hi.item.y)||{}).id],dimv:SIMH.dim[hi.id]||100,ring:SIMH.ring[hi.id]!==undefined&&SIMH.t-SIMH.ring[hi.id]<2,anyTrip:Object.keys(SIMH.trip).some(k=>SIMH.trip[k]),on:SIMH.main,ext:()=>m.h.items.some(i=>i.k==='split_i'&&SIMH.run[i.id]&&hsLive(itemCode(m,i)))})});
   R.loads.forEach(l=>{const n=l.it.n,live=!!(fl.live[n.id]&&S.on),st=S.fault&&S.fault.id===n.id?S.fault:null;
     const stall=!!(st&&st.opt&&st.opt.rotor&&live),phase=!!(st&&st.opt&&st.opt.phase&&live),ref=l.it.i.amp||0;
     l.upd({live:live&&!S.burn[n.id],t,dt,n,stall,phase,ratio:ref?(fl.I[n.id]||0)/ref:0});
@@ -522,7 +528,7 @@ function bindEvents(cv){
     else if(M.ui.carry)ghost(slotAt(e))});
   cv.addEventListener('pointerup',e=>{const wasMoved=moved>6;delete P[e.pointerId];if(wasMoved)return;
     if(M.mode==='build'){if(M.ui.carry){if(place(e))return}const k=pickDev(e);if(k&&M.C.by[k]){M.ui.sel=k;M.ui.carry=null}else if(!M.ui.carry)M.ui.sel=null;panels();return}
-    if(M.view==='casa'){pickDev(e);if(M.ui.item){hsClick(M.ui.item);hsRefresh(true);panels()}return}
+    if(M.view==='casa'){pickDev(e);if(M.ui.item){if(SIMH.delMode)hsDelId(M.ui.item);else{hsClick(M.ui.item);hsRefresh(true);panels()}}return}
     const k=pickDev(e);if(!k||!M.C.by[k])return;M.ui.sel=k;const it=M.C.by[k];
     if(!it.isLoad){const st=M.sim.st[it.n.id];
       if(st.destroyed){say('«'+nameOf(it.n)+'» está destruido: usa «Rearmar todo» para reponerlo.')}

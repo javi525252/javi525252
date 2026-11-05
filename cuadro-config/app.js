@@ -225,6 +225,7 @@ function bom(proj){
     if(a.issues.some(i=>i.lv==='err'))ok=false;
   });
   if(typeof houseBOM==='function')houseBOM(proj.house).forEach(r=>{rows[r.p.id]=r});
+  if(typeof logoBOM==='function')logoBOM(proj).forEach(r=>{rows[r.p.id]=r});
   return{rows:Object.values(rows),mods,ok};
 }
 function budget(proj){
@@ -243,17 +244,18 @@ function render(){
   const proj=P();
   $('#proj').innerHTML=S.projects.map((p,i)=>`<option value="${i}" ${i===S.cur?'selected':''}>${esc(p.name)}</option>`).join('');
   $('#proj').onchange=e=>{S.cur=+e.target.value;selId=null;render()};
-  const tabs=[['casa','Casa (plano)'],['design','Cuadro'],['diagram','Esquema unifilar'],['encl','Envolvente'],['m3d','Montaje 3D'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
+  const tabs=[['casa','Casa (plano)'],['logo','Domótica (autómata)'],['design','Cuadro'],['diagram','Esquema unifilar'],['encl','Envolvente'],['m3d','Montaje 3D'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
   $('#nav').innerHTML=tabs.map(([k,n])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
-  const f={casa:vCasa,design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,m3d:vM3D,project:vProject}[tab];
+  const f={logo:vLogo,casa:vCasa,design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,m3d:vM3D,project:vProject}[tab];
   $('#app').innerHTML=boardBar()+f();
   if(tab==='design')wireDnD();
   if(tab==='m3d')M3D.mount();
   if(tab==='casa')casaMount();
+  if(tab==='logo')lgMount();
 }
 window.go=t=>{tab=t;render()};
 function boardBar(){
-  if(['catalog','project','casa'].includes(tab))return'';
+  if(['catalog','project','casa','logo'].includes(tab))return'';
   const p=P();
   return`<div class="bar noprint"><b>Cuadro:</b>${p.boards.map((b,i)=>`<button class="b ${i===p.cur?'':'s'}" onclick="P().cur=${i};selId=null;render()">${esc(b.name)}</button>`).join('')}
   <button class="b s" onclick="addBoard()">+ Cuadro</button><button class="b s" onclick="dupBoard()">Duplicar</button><button class="b s" onclick="delBoard()">Eliminar</button></div>`;
