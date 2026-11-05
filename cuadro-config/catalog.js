@@ -23,6 +23,22 @@
   add('Reloj programador','other',0,2,0,2,42);
   add('Piloto/Señalizador','other',0,1,0,1,6);
   add('Seccionador portafusibles 32A','other',32,2,0,2,18);
+  // ---- Motores, arranque y receptores (añadidos al final para conservar los ids anteriores) ----
+  [[0.63,1],[1,1.6],[1.6,2.5],[2.5,4],[4,6.3],[6,10],[9,14],[13,18],[17,23],[20,25],[24,32],[30,40],[37,50],[48,65]]
+    .forEach(([lo,hi],x)=>add(`Guardamotor ${lo}–${hi} A 3P`,'mpcb',hi,3,50,3,42+x*6,{lo,hi}));
+  [[1,1.6],[1.6,2.5],[2.5,4],[4,6],[5.5,8],[7,10],[9,13],[12,18],[16,24],[23,32],[30,40],[37,50],[48,65],[63,80],[80,104]]
+    .forEach(([lo,hi],x)=>add(`Relé térmico ${lo}–${hi} A`,'thermal',hi,3,0,2,28+x*5,{lo,hi}));
+  [[9,4],[12,5.5],[18,7.5],[25,11],[32,15],[40,18.5],[50,22],[65,30],[80,37],[95,45],[115,55],[150,75],[185,90],[225,110],[265,132],[330,160],[400,200]]
+    .forEach(([i,kw],x)=>add(`Contactor AC-3 ${i} A (${kw} kW)`,'contactor',i,3,0,i<=40?3:i<=115?5:8,24+x*14,{ac3:true,kw}));
+  [[16,7.5],[32,15],[61,30],[110,55],[170,90]].forEach(([i,kw],x)=>add(`Arrancador suave ${kw} kW ${i} A`,'softstart',i,3,0,6+x*2,190+x*160,{kw}));
+  [[2.3,0.75],[5.8,2.2],[13,5.5],[24,11],[46,22],[75,37],[145,75]].forEach(([i,kw],x)=>add(`Variador de frecuencia ${kw} kW ${i} A`,'vfd',i,3,0,8+x*2,260+x*190,{kw}));
+  const load=(name,lt,poles,kind='load')=>add(name,kind,0,poles,0,0,0,{ltype:lt});
+  load('Alumbrado','alumbrado',2);load('Tomas de corriente','tomas',2);load('Cocina / horno','cocina',2);load('Lavadora / lavavajillas','lavadora',2);
+  load('Aire acondicionado monofásico','aire',2);load('Aire acondicionado trifásico','aire',3);load('Calentador / termo eléctrico','calefaccion',2);load('Calefacción trifásica','calefaccion',3);
+  load('Cargador vehículo eléctrico monofásico','vehiculo',2);load('Cargador vehículo eléctrico trifásico','vehiculo',3);
+  load('Inversor fotovoltaico monofásico','fv',2);load('Inversor fotovoltaico trifásico','fv',3);load('Soldadora','soldadura',2);
+  load('Motor eléctrico trifásico','motor',3,'motor');load('Motor eléctrico monofásico','motor',2,'motor');load('Bomba (motor trifásico)','bomba',3,'motor');
+  load('Ventilador (motor trifásico)','ventilador',3,'motor');load('Compresor (motor trifásico)','compresor',3,'motor');load('Ascensor / polipasto (motor)','ascensor',3,'motor');
   window.DEFAULT_CATALOG=P;
   window.ENCLOSURES=[
     {id:'e1',name:'Caja empotrar 1 fila 12 mód.',rows:1,cols:12,price:14},

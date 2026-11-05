@@ -30,3 +30,9 @@ Abre `index.html` en Chrome/Edge (no necesita instalación ni servidor). Los dat
 - Catálogo y precios son **genéricos de ejemplo**: sustitúyelos por los de tu proveedor en la pestaña «Catálogo».
 - No usa marcas ni datos de Schneider Electric; es una herramienta independiente.
 - Cálculos orientativos: validar por técnico competente (REBT / IEC 61439) antes de fabricar o instalar.
+
+## Novedades
+- **Instalaciones y receptores:** plantillas (vivienda, vivienda con VE y FV, local, oficina, taller, garaje, piscina, bombeo) y catálogo de receptores: alumbrado, tomas, cocina, aire acondicionado, calefacción, recarga de vehículo eléctrico, fotovoltaica, soldadura y motores.
+- **Motores:** guardamotores, relés térmicos, contactores AC-3, arrancadores suaves y variadores. Arranque directo, estrella-triángulo, suave y variador.
+- **Convalidación:** veredicto «válida / válida con avisos / no válida» con comprobaciones tipo REBT (ITC-BT-25 vivienda, ITC-BT-47 motores, ITC-BT-52 recarga VE, ITC-BT-40 fotovoltaica): protecciones, secciones, caída de tensión, corrientes de arranque, selectividad y poder de corte.
+- **Montaje 3D:** cuadro con carriles, canaletas, bornas, puerta y sombras; vista de **instalación completa** con motores, lámparas, cargas y cables animados; fallos (cortocircuito, sobrecarga, fuga, rotor bloqueado, falta de fase) con indicación de dónde y qué protección actúa.
