@@ -81,3 +81,13 @@ Nuevos elementos (pestaña «Casa (plano)»): **persiana motorizada**, **electro
 - **Plan de pedidos:** indicando la fecha de inicio de obra, calcula "Pedir antes del" para cada proveedor según su plazo. Aparece también en el informe.
 - **Pegar tarifa:** una línea por artículo con `parte del nombre ; precio`.
 - Los pedidos copiados y el CSV incluyen el plazo. Todo viaja dentro del código `CC1:` del proyecto.
+
+## Cálculos, documentos, obra y prácticas (última tanda)
+- **Cálculos** (pestaña nueva): Icc y poder de corte de cada aparato, **longitud máxima protegida** (disparo magnético garantizado al final del cable), **selectividad** entre protecciones (total / parcial / ninguna, también entre diferenciales), **previsión de potencia** con potencia a contratar e IGA recomendado, y **balance de fases** con botón para equilibrar.
+- **Documentos:** datos de tu empresa y **logo**; presupuesto para el cliente por capítulos con firma y condiciones, **memoria técnica de diseño** y **borrador de certificado de instalación**. La cabecera de empresa sale también en el informe.
+- **Ofertas:** guarda versiones del proyecto («Básica», «Confort»…) y compáralas lado a lado (total, material, horas, errores, material que cambia). Restaurar o abrir como proyecto.
+- **Obra:** mediciones y horas por partida, cronograma con diagrama de Gantt (operarios, horas/día, fines de semana excluidos) y fecha de fin.
+- **Averías:** taller de 8 averías (fuga intermitente, sobretensión, neutro cortado, borne flojo, sobrecarga, protección sobredimensionada, falta de fase, sin tierra) con **modo examen**: la app inventa una, mides con 6 herramientas y diagnosticas; puntuación y explicación de cómo se localiza.
+- **Plano de la casa:** selección múltiple (toque, recuadro, Ctrl/Mays), copiar/pegar/duplicar (Ctrl+C/V/D), alinear y repartir, mover con flechas, y **plano de fondo** (foto) para calcar a escala.
+- **Normativa nueva:** baño por volúmenes (ITC-BT-27), garaje y recarga de VE (ITC-BT-52), exteriores y locales mojados (ITC-BT-30), paneles fotovoltaicos y batería (ITC-BT-40, RD 244/2019).
+- **App instalable (PWA):** botón «Instalar app», icono propio y funcionamiento sin conexión una vez cargada.
