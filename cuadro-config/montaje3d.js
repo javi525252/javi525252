@@ -39,7 +39,7 @@ M.setView=v=>{M.view=v;if(v==='casa'){M.mode='demo';hsInit()}M.ui.carry=null;M.u
 M.refreshCasa=()=>{if(M.R&&M.view==='casa'){rebuild();panels()}};
 M.door=v=>{M.door_=v;if(M.R&&M.R.doorG)M.R.doorG.visible=v};
 M.resetCam=()=>{const R=M.R;if(!R)return;const C=M.C;
-  if(M.view==='casa'){const h=HS(),W=h.w,D=h.h;R.dim={W,D};R.cam={th:0.3,ph:0.95,r:Math.max(W,D)*1.3,t:new THREE.Vector3(W/2,30,D/2)}}
+  if(M.view==='casa'){const pd=planDims(HS()),W=pd.w,D=pd.h;R.dim={W,D,nf:pd.nf};R.cam={th:0.3,ph:0.95,r:Math.max(W,D,pd.nf*FH*1.4)*1.3,t:new THREE.Vector3(W/2,pd.nf*FH/2-80,D/2)}}
   else if(M.view==='instalacion'){const d=R.dim||{W:520,D:320};R.cam={th:0.5,ph:1.12,r:Math.max(d.W,d.D)*1.15,t:new THREE.Vector3(d.W/2,100,d.D/2.4)}}
   else{const H=C.rows*RP+8,W=C.cols*MW+10;R.cam={th:0.28,ph:1.4,r:Math.max(H*1.45,W*1.5,60),t:new THREE.Vector3(0,0,3)}}};
 function autoPlace(C){C.inst.forEach(it=>delete C.layout[it.key]);let r=0,c=0;
@@ -324,21 +324,22 @@ function mkHouseItem(it,d,room,H){
   else wm(10,10,10,hexc(HCAT[d.cat].c),0,0,5);
   return{g,upd,wall}}
 function buildCasa(C,R,root){
-  const h=HS(),H=houseCalc(h),W=h.w,D=h.h;R.dim={W,D};R.pick=[];R.hitems=[];Object.keys(CIRCCOL).forEach(k=>CC[k]=CIRCCOL[k]);
+  const h=HS(),H=houseCalc(h),pd=planDims(h),W=pd.w,D=pd.h,Bs=y=>flOf(y)*FH,V=(x,yy,y)=>new THREE.Vector3(x,Bs(y)+yy,lyOf(y));R.dim={W,D,nf:pd.nf};R.pick=[];R.hitems=[];Object.keys(CIRCCOL).forEach(k=>CC[k]=CIRCCOL[k]);
   const gnd=new THREE.Mesh(new THREE.PlaneGeometry(W+900,D+900),MAT(0xc8d5c2));gnd.rotation.x=-Math.PI/2;gnd.position.set(W/2,-0.6,D/2);gnd.receiveShadow=true;root.add(gnd);
   const wmat=new THREE.MeshLambertMaterial({color:0xf3efe6,transparent:true,opacity:0.5,depthWrite:false});
-  h.rooms.forEach(r=>{const f=new THREE.Mesh(new THREE.PlaneGeometry(r.w,r.h),MAT(hexc(RCOL[r.type])));f.rotation.x=-Math.PI/2;f.position.set(r.x+r.w/2,0.4,r.y+r.h/2);f.receiveShadow=true;root.add(f);
+  h.rooms.forEach(r=>{const f=new THREE.Mesh(new THREE.PlaneGeometry(r.w,r.h),MAT(hexc(RCOL[r.type])));f.rotation.x=-Math.PI/2;f.position.set(r.x+r.w/2,Bs(r.y)+0.4,lyOf(r.y)+r.h/2);f.receiveShadow=true;root.add(f);
     [[r.w,0,-r.h/2],[r.w,0,r.h/2],[0,r.h,-r.w/2],[0,r.h,r.w/2]].forEach(([a,b,c],i)=>{const wl=new THREE.Mesh(new THREE.BoxGeometry(i<2?r.w:10,250,i<2?10:r.h),wmat);
-      wl.position.set(r.x+r.w/2+(i===2?-r.w/2:i===3?r.w/2:0),125,r.y+r.h/2+(i===0?-r.h/2:i===1?r.h/2:0));root.add(wl)});
-    const t=mkText(r.name||RT[r.type]);t.scale.set(48,7,1);t.position.set(r.x+r.w/2,6,r.y+r.h/2);root.add(t)});
+      wl.position.set(r.x+r.w/2+(i===2?-r.w/2:i===3?r.w/2:0),Bs(r.y)+125,lyOf(r.y)+r.h/2+(i===0?-r.h/2:i===1?r.h/2:0));root.add(wl)});
+    const t=mkText(r.name||RT[r.type]);t.scale.set(48,7,1);t.position.set(r.x+r.w/2,Bs(r.y)+6,lyOf(r.y)+r.h/2);root.add(t);
+    if(flOf(r.y)>0){const sl=new THREE.Mesh(new THREE.BoxGeometry(r.w,6,r.h),MAT(0xcfc7b8));sl.position.set(r.x+r.w/2,Bs(r.y)-3,lyOf(r.y)+r.h/2);sl.receiveShadow=true;root.add(sl)}});
   // código de circuito de cada elemento
   const codeOf={};Object.values(H.circ).forEach(c=>c.items.forEach(i=>codeOf[i.id]=c.code));
   const cab=h.items.find(i=>i.k==='cuadro'),WK=h.wmode==='manual'?wiringCalc(h):null;
   h.items.forEach(it=>{const d=HI[it.k],r=roomAt(h,it.x,it.y);const m=mkHouseItem(it,d,r,H);const g=m.g;
-    let x=it.x,z=it.y,ry=0;
-    if(m.wall&&r){const dl=x-r.x,dr=r.x+r.w-x,dt=z-r.y,db=r.y+r.h-z,mn=Math.min(dl,dr,dt,db);
-      if(mn===dt){z=r.y+6;ry=0}else if(mn===db){z=r.y+r.h-6;ry=Math.PI}else if(mn===dl){x=r.x+6;ry=Math.PI/2}else{x=r.x+r.w-6;ry=-Math.PI/2}}
-    g.position.set(x,m.wall?(d.hz||0):0,z);g.rotation.y=ry;
+    let x=it.x,z=lyOf(it.y),ry=0;const rY=r?lyOf(r.y):0;
+    if(m.wall&&r){const dl=x-r.x,dr=r.x+r.w-x,dt=z-rY,db=rY+r.h-z,mn=Math.min(dl,dr,dt,db);
+      if(mn===dt){z=rY+6;ry=0}else if(mn===db){z=rY+r.h-6;ry=Math.PI}else if(mn===dl){x=r.x+6;ry=Math.PI/2}else{x=r.x+r.w-6;ry=-Math.PI/2}}
+    g.position.set(x,Bs(it.y)+(m.wall?(d.hz||0):0),z);g.rotation.y=ry;
     let code=codeOf[it.id]||(d.sw?'C1':null);if(it.k==='router'||it.k==='ap'||d.pw)code='C2';
     if(WK){code=WK.code[it.id]||(needsWire(it)?'NC':(d.pw?'C2':null))}
     const cn=code&&C.circNode[code];g.userData={key:cn&&['luz','foco','interruptor','conmutador','extractor'].includes(it.k)||cn&&d.circ?cn.key:(cn&&d.sw?cn.key:null),itemId:it.id};
@@ -348,18 +349,18 @@ function buildCasa(C,R,root){
   if(!WK){
   Object.values(H.circ).forEach(c=>{const cn=C.circNode[c.code],id=cn?cn.n.id:null,rad=1.0+c.def.sec*0.05;
     c.segs.forEach(sg=>{const d=HI[sg.it.k],hz=d.hz||30,a=sg.a,b=sg.b;
-      const pts=[new THREE.Vector3(a.x,238,a.y),new THREE.Vector3(b.x,238,a.y),new THREE.Vector3(b.x,238,b.y)];
+      const pts=[V(a.x,238,a.y),V(b.x,238,a.y),V(b.x,238,b.y)];
       addCable(R,root,pts,rad,c.code,null,12).hcirc=c.code;
-      if(hz<230)addCable(R,root,[new THREE.Vector3(b.x,238,b.y),new THREE.Vector3(b.x,Math.max(hz,5)+12,b.y)],rad,c.code,null,6).hcirc=c.code});
-    if(c.segs[0]&&cab)addCable(R,root,[new THREE.Vector3(cab.x,238,cab.y),new THREE.Vector3(cab.x,150,cab.y)],rad,c.code,null,6).hcirc=c.code});
+      if(hz<230)addCable(R,root,[V(b.x,238,b.y),V(b.x,Math.max(hz,5)+12,b.y)],rad,c.code,null,6).hcirc=c.code});
+    if(c.segs[0]&&cab)addCable(R,root,[V(cab.x,238,cab.y),V(cab.x,150,cab.y)],rad,c.code,null,6).hcirc=c.code});
   }else{const by={};h.items.forEach(x=>by[x.id]=x);(h.links||[]).forEach(l=>{const a=by[l.a],b=by[l.b];if(!a||!b)return;const code=WK.link[l.id]||l.code,col=code?CIRCCOL[code]:0x9aa7b0,hz=HI[b.k].hz||30;
-      const pts=[new THREE.Vector3(a.x,238,a.y),new THREE.Vector3(b.x,238,a.y),new THREE.Vector3(b.x,238,b.y)];
-      if(code){CC[code]=CIRCCOL[code];addCable(R,root,pts,1.2,code,null,12).hcirc=code;if(hz<230)addCable(R,root,[new THREE.Vector3(b.x,238,b.y),new THREE.Vector3(b.x,Math.max(hz,5)+12,b.y)],1.2,code,null,6).hcirc=code}
+      const pts=[V(a.x,238,a.y),V(b.x,238,a.y),V(b.x,238,b.y)];
+      if(code){CC[code]=CIRCCOL[code];addCable(R,root,pts,1.2,code,null,12).hcirc=code;if(hz<230)addCable(R,root,[V(b.x,238,b.y),V(b.x,Math.max(hz,5)+12,b.y)],1.2,code,null,6).hcirc=code}
       else{tube(root,pts,1.2,col)}})}
   // tuberías: agua fría, caliente, gas; datos
   H.pipes.forEach(p=>{const col=p.t==='cold'?0x1e88e5:p.t==='hot'?0xe53935:0xfb8c00,y=p.t==='cold'?12:p.t==='hot'?20:28,rad=1.5+p.dn/14;
-    tube(root,[new THREE.Vector3(p.a.x,y,p.a.y),new THREE.Vector3(p.b.x,y,p.a.y),new THREE.Vector3(p.b.x,y,p.b.y)],rad,col)});
-  H.tel.forEach(t=>{const a=t.a,b=t.it;tube(root,[new THREE.Vector3(a.x,232,a.y),new THREE.Vector3(b.x,232,a.y),new THREE.Vector3(b.x,232,b.y),new THREE.Vector3(b.x,40,b.y)],0.9,t.coax?0x7e57c2:0x00acc1)});
+    tube(root,[V(p.a.x,y,p.a.y),V(p.b.x,y,p.a.y),V(p.b.x,y,p.b.y)],rad,col)});
+  H.tel.forEach(t=>{const a=t.a,b=t.it;tube(root,[V(a.x,232,a.y),V(b.x,232,a.y),V(b.x,232,b.y),V(b.x,40,b.y)],0.9,t.coax?0x7e57c2:0x00acc1)});
 }
 
 // ---------- visuales por fotograma ----------

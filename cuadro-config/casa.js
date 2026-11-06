@@ -1,8 +1,8 @@
 'use strict';
 /* Casa completa: plano 2D, elementos de todas las instalaciones, rutas, validación y generación del cuadro */
 const HCAT={ele:{n:'Eléctrica',c:'#f9a825'},tel:{n:'Telecom y domótica',c:'#00acc1'},cli:{n:'Climatización y ACS',c:'#e53935'},agu:{n:'Fontanería',c:'#1e88e5'},gas:{n:'Gas',c:'#fb8c00'}};
-const RT={salon:'Salón / comedor',dormitorio:'Dormitorio',cocina:'Cocina',bano:'Baño / aseo',pasillo:'Pasillo',vestibulo:'Vestíbulo / entrada',terraza:'Terraza / exterior',garaje:'Garaje',trastero:'Trastero',lavadero:'Lavadero',otro:'Otra estancia'};
-const RCOL={salon:'#fff3d6',dormitorio:'#e3f0ff',cocina:'#ffe5d9',bano:'#d9f4f1',pasillo:'#f0f0f0',vestibulo:'#f3e8ff',terraza:'#e6f4d9',garaje:'#e2e2e2',trastero:'#ece3d3',lavadero:'#d9ecf4',otro:'#f5f5f5'};
+const RT={salon:'Salón / comedor',dormitorio:'Dormitorio',cocina:'Cocina',bano:'Baño / aseo',pasillo:'Pasillo',vestibulo:'Vestíbulo / entrada',terraza:'Terraza / exterior',garaje:'Garaje',escalera:'Escalera',trastero:'Trastero',lavadero:'Lavadero',otro:'Otra estancia'};
+const RCOL={salon:'#fff3d6',dormitorio:'#e3f0ff',cocina:'#ffe5d9',bano:'#d9f4f1',pasillo:'#f0f0f0',vestibulo:'#f3e8ff',terraza:'#e6f4d9',garaje:'#e2e2e2',escalera:'#e8e0f0',trastero:'#ece3d3',lavadero:'#d9ecf4',otro:'#f5f5f5'};
 // kw: potencia eléctrica; ud: caudal de agua (L/s); dn: diámetro mínimo; kwg: potencia de gas; pw: necesita alimentación 230 V; hz: altura de montaje (cm)
 const HI={
   luz:{cat:'ele',n:'Punto de luz',ab:'L',kw:0.1,circ:'C1',hz:250,pr:4.5},foco:{cat:'ele',n:'Foco empotrado',ab:'F',kw:0.02,circ:'C1',hz:250,pr:6},
@@ -13,6 +13,7 @@ const HI={
   toma_bano:{cat:'ele',n:'Toma de baño',ab:'TB',circ:'C5',hz:110,pr:8},toma_enc:{cat:'ele',n:'Toma encimera cocina',ab:'TC',circ:'C5',hz:110,pr:8},
   toma_horno:{cat:'ele',n:'Toma cocina/horno 25 A',ab:'TH',kw:4.5,circ:'C3',hz:60,pr:14},toma_lav:{cat:'ele',n:'Toma lavadora',ab:'TL',kw:2.2,circ:'C4',hz:100,pr:8},
   toma_lvj:{cat:'ele',n:'Toma lavavajillas',ab:'TV',kw:2,circ:'C4',hz:30,pr:8},toma_sec:{cat:'ele',n:'Toma secadora',ab:'TS',kw:2.5,circ:'C10',hz:100,pr:8},
+  cargador_ve:{cat:'ele',n:'Cargador de vehículo eléctrico',ab:'VE',kw:6.6,circ:'C13',hz:120,pr:650},
   extractor:{cat:'ele',n:'Extractor',ab:'EX',kw:0.03,circ:'C1',hz:230,pr:38},cuadro:{cat:'ele',n:'Cuadro general',ab:'CG',hz:150,pr:0,unique:true},
   tv:{cat:'tel',n:'Toma TV/antena',ab:'TV',hz:30,pr:8},rj45:{cat:'tel',n:'Toma de datos RJ45',ab:'RJ',hz:30,pr:11,net:1},router:{cat:'tel',n:'Router / registro de datos',ab:'RT',hz:150,pr:60,pw:1,net:1,unique:true},
   ap:{cat:'tel',n:'Punto WiFi',ab:'WF',hz:230,pr:70,pw:1,net:1},videop:{cat:'tel',n:'Videoportero',ab:'VP',hz:140,pr:190,pw:1},alarma:{cat:'tel',n:'Central de alarma',ab:'AL',hz:150,pr:240,pw:1},
@@ -40,13 +41,17 @@ const CIRC={
   C5:{n:'Baño y auxiliares de cocina',lt:'tomas',In:16,sec:2.5,maxPts:6,max:2.9,extra:'C12'},C6:{n:'Alumbrado adicional',lt:'alumbrado',In:10,sec:1.5,maxPts:30,max:1.8},
   C7:{n:'Tomas adicionales',lt:'tomas',In:16,sec:2.5,maxPts:20,max:2.9},C8:{n:'Calefacción eléctrica',lt:'calefaccion',In:25,sec:6,max:4.6},
   C9:{n:'Aire acondicionado',lt:'aire',In:25,sec:6,max:4.6},C10:{n:'Secadora',lt:'lavadora',In:16,sec:2.5,max:2.9},C11:{n:'Automatización',lt:'tomas',In:10,sec:1.5,max:1.5},
+  C13:{n:'Recarga de vehículo eléctrico',lt:'vehiculo',In:32,sec:6,maxPts:1,max:7.3},
   C12:{n:'Baño y cocina adicional',lt:'tomas',In:16,sec:2.5,maxPts:6,max:2.9}};
-const CIRCCOL={C1:0xf9a825,C2:0x1565c0,C3:0xd84315,C4:0x6a1b9a,C5:0x00838f,C6:0xfbc02d,C7:0x42a5f5,C8:0xe53935,C9:0x26a69a,C10:0x8e24aa,C11:0x558b2f,C12:0x00acc1};
+const CIRCCOL={C1:0xf9a825,C2:0x1565c0,C3:0xd84315,C4:0x6a1b9a,C5:0x00838f,C6:0xfbc02d,C7:0x42a5f5,C8:0xe53935,C9:0x26a69a,C10:0x8e24aa,C11:0x558b2f,C12:0x00acc1,C13:0x3949ab};
 const NOM=[12,16,20,25,32,40,50],ISOL={salon:1};
-function newHouse(){return{w:1000,h:800,persons:3,rooms:[],items:[]}}
+function newHouse(){return{w:1000,h:800,persons:3,nf:1,fn:['Planta baja'],rooms:[],items:[]}}
 const HS=()=>{const p=P();if(!p.house)p.house=newHouse();return p.house};
 const roomAt=(h,x,y)=>h.rooms.find(r=>x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)||null;
-const hdist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),manh=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+const FY=5000,FH=270;
+const flOf=y=>Math.max(0,Math.floor((y+FY/2)/FY)),lyOf=y=>y-flOf(y)*FY;
+const hdist=(a,b)=>Math.hypot(a.x-b.x,lyOf(a.y)-lyOf(b.y))+Math.abs(flOf(a.y)-flOf(b.y))*350,manh=(a,b)=>Math.abs(a.x-b.x)+Math.abs(lyOf(a.y)-lyOf(b.y))+Math.abs(flOf(a.y)-flOf(b.y))*350;
+function planDims(h){const rs=h.rooms.length?h.rooms:[{x:0,y:0,w:300,h:300}];return{w:Math.max(300,...rs.map(r=>r.x+r.w)),h:Math.max(300,...rs.map(r=>lyOf(r.y)+r.h)),nf:Math.max(h.nf||1,...rs.map(r=>flOf(r.y)+1))}}
 const itemKw=it=>{const d=HI[it.k]||{};if(it.k==='suelo')return Math.round((it.w||200)*(it.d||150)/10000*0.1*100)/100;return it.kw!=null?it.kw:(d.kw||0)};
 function chainFrom(start,pts){const left=pts.slice(),order=[];let cur={x:start.x,y:start.y},c=0;
   while(left.length){let bi=0,bd=1e12;left.forEach((p,i)=>{const d=manh(cur,p);if(d<bd){bd=d;bi=i}});const p=left.splice(bi,1)[0];c+=bd;order.push({p,a:{x:cur.x,y:cur.y},cm:bd,cum:c});cur=p}
@@ -68,6 +73,7 @@ function houseCalc(h){
   const cab=h.items.find(i=>i.k==='cuadro')||{x:30,y:30},R={circ:{},elec:[],tel:[],cold:null,hot:null,gas:null,pipes:[],area:0};
   R.area=h.rooms.filter(r=>r.type!=='terraza').reduce((s,r)=>s+r.w*r.h/10000,0);R.elev=isElevated(h);
   const used={};h.items.forEach(it=>{const d=HI[it.k];if(!d||!d.circ)return;const code=Wc?(Wc.code[it.id]||null):(it.circ||d.circ);if(!code||!CIRC[code])return;(used[code]=used[code]||[]).push(it)});
+  if(planDims(h).nf>1)Object.keys(CIRC).forEach(c=>{const def=CIRC[c];if(def.extra&&used[c]){const up=used[c].filter(i=>flOf(i.y)>=1);if(up.length&&up.length<used[c].length){used[c]=used[c].filter(i=>flOf(i.y)<1);used[def.extra]=(used[def.extra]||[]).concat(up)}}});
   // desbordamiento a circuitos adicionales
   Object.keys(CIRC).forEach(c=>{const def=CIRC[c];if(def.maxPts&&def.extra&&used[c]&&used[c].length>def.maxPts){const sorted=used[c].slice().sort((a,b)=>(a.x+a.y*3)-(b.x+b.y*3));used[c]=sorted.slice(0,def.maxPts);used[def.extra]=(used[def.extra]||[]).concat(sorted.slice(def.maxPts))}});
   if(h.items.some(i=>i.k==='dom'))used.C11=(used.C11||[]).concat(h.items.filter(i=>i.k==='dom'));
@@ -102,7 +108,7 @@ function houseCalc(h){
 // ---------- validación normativa ----------
 function roomNeeds(r){const area=r.w*r.h/10000,len=Math.max(r.w,r.h)/100;
   return({vestibulo:{luz:1,toma:1},pasillo:{luz:Math.max(1,Math.ceil(len/5)),toma:Math.max(1,Math.ceil(len/5))},salon:{luz:Math.max(1,Math.ceil(area/18)),toma:Math.max(3,Math.ceil(area/6)),tv:1,rj45:1},
-    dormitorio:{luz:1,toma:3,tv:1,rj45:1},cocina:{luz:2,toma:1,toma_enc:3,toma_horno:1,tv:1,rj45:1},bano:{luz:1,toma_bano:1},terraza:{luz:1},garaje:{luz:1,toma:1},trastero:{luz:1},lavadero:{luz:1,toma_lav:1},otro:{luz:1}})[r.type]||{luz:1}}
+    dormitorio:{luz:1,toma:3,tv:1,rj45:1},cocina:{luz:2,toma:1,toma_enc:3,toma_horno:1,tv:1,rj45:1},bano:{luz:1,toma_bano:1},terraza:{luz:1},garaje:{luz:1,toma:1},escalera:{luz:1},trastero:{luz:1},lavadero:{luz:1,toma_lav:1},otro:{luz:1}})[r.type]||{luz:1}}
 function countIn(h,r,k){return h.items.filter(i=>{const x=roomAt(h,i.x,i.y);if(!x||x.id!==r.id)return false;if(k==='luz')return i.k==='luz'||i.k==='foco';if(k==='int')return HI[i.k].sw;return i.k===k}).length}
 function houseIssues(h,C){
   const out=[],bad=(lv,cat,id,msg)=>out.push({lv,cat,id:id||null,msg});C=C||houseCalc(h);
@@ -168,17 +174,17 @@ function houseIssues(h,C){
 function genBoard(b,h){
   const C=houseCalc(h),codes=Object.keys(C.circ).filter(c=>C.circ[c].pts>0);
   if(!codes.length)return false;
-  const prodOf={C1:'Alumbrado',C6:'Alumbrado',C2:'Tomas de corriente',C5:'Tomas de corriente',C7:'Tomas de corriente',C12:'Tomas de corriente',C11:'Tomas de corriente',C3:'Cocina / horno',C4:'Lavadora / lavavajillas',C10:'Lavadora / lavavajillas',C8:'Calentador / termo eléctrico',C9:'Aire acondicionado monofásico'};
+  const prodOf={C1:'Alumbrado',C6:'Alumbrado',C2:'Tomas de corriente',C5:'Tomas de corriente',C7:'Tomas de corriente',C12:'Tomas de corriente',C11:'Tomas de corriente',C13:'Cargador vehículo eléctrico monofásico',C3:'Cocina / horno',C4:'Lavadora / lavavajillas',C10:'Lavadora / lavavajillas',C8:'Calentador / termo eléctrico',C9:'Aire acondicionado monofásico'};
   const mcbOf=a=>nm(`Magnetotérmico ${a}A 1P+N C`);
   const circNode=code=>{const c=C.circ[code],kw=Math.max(0.1,Math.round(c.kw*100)/100);
     return N(`Magnetotérmico ${c.def.In}A 1P+N C`,{label:`${code} ${c.def.n}`,circ:code},[N(prodOf[code],{kw,len:Math.max(5,c.lenM),lenTot:c.totM,label:`${code} ${c.def.n}`,pf:0.95,circ:code,ltype:c.def.lt})])};
   const groups=[codes.filter(c=>['C1','C2','C3','C4','C5'].includes(c)),codes.filter(c=>!['C1','C2','C3','C4','C5'].includes(c))].filter(g=>g.length);
-  b.use='vivienda';b.phases=1;b.ks=0.7;b.isc=6;b.layout={};b.name='Cuadro vivienda (desde la casa)';
+  const tot=codes.reduce((s,c)=>s+C.circ[c].kw*1000/230/0.95,0)*0.7,tri=tot>60;
+  b.use='vivienda';b.phases=tri?3:1;b.ks=0.7;b.isc=6;b.layout={};b.name='Cuadro vivienda (desde la casa)';
   const chunks=[];groups.forEach(g=>{for(let i=0;i<g.length;i+=5)chunks.push(g.slice(i,i+5))});
   const diffs=chunks.map((g,i)=>{const nodes=g.map(circNode);const sum=g.reduce((s,c)=>s+C.circ[c].kw*1000/230/0.95,0)*0.7;
-    return N(sum>36?'Diferencial 63A 2P 30mA':'Diferencial 40A 2P 30mA',{label:`Diferencial ${i+1}`},nodes)});
-  const tot=codes.reduce((s,c)=>s+C.circ[c].kw*1000/230/0.95,0)*0.7;
-  b.root=N(tot>40?'Interruptor general 63A 2P':'Interruptor general 40A 2P',{label:'IGA'},[N('Protector sobretensiones tipo 2 1P+N',{label:'Sobretensiones'})].concat(diffs));
+    return N(tri?(sum>36?'Diferencial 63A 4P 30mA':'Diferencial 40A 4P 30mA'):(sum>36?'Diferencial 63A 2P 30mA':'Diferencial 40A 2P 30mA'),{label:`Diferencial ${i+1}`},nodes)});
+  b.root=N(tri?'Automático caja moldeada 100A 4P':(tot>40?'Interruptor general 63A 2P':'Interruptor general 40A 2P'),{label:'IGA'},[N(tri?'Protector sobretensiones tipo 2 3P+N':'Protector sobretensiones tipo 2 1P+N',{label:'Sobretensiones'})].concat(diffs));
   return true}
 
 // ---------- equipado automático según normativa ----------
@@ -206,13 +212,15 @@ function autoEquip(h,opt={}){
   if(ves&&!h.items.some(i=>i.k==='videop')&&opt.dom){const p=odd(ves,3);add('videop',p.x,p.y)}
 }
 const HTPL={
+  duplex:{n:'Dúplex de 2 plantas (4 dormitorios)',nf:2,fn:['Planta baja','Planta 1'],persons:4,rooms:[['vestibulo',0,0,200,300,0],['escalera',200,0,150,300,0],['salon',350,0,450,400,0],['cocina',800,0,300,400,0],['bano',0,300,200,200,0],['terraza',1100,0,250,400,0],
+    ['escalera',200,0,150,300,1],['pasillo',350,0,1200,120,1],['dormitorio',350,120,300,300,1],['dormitorio',650,120,300,300,1],['dormitorio',950,120,300,300,1],['dormitorio',1250,120,300,300,1],['bano',0,0,200,300,1]]},
   piso:{n:'Piso de 3 dormitorios (80 m²)',rooms:[['vestibulo',0,0,200,400],['salon',200,0,450,400],['cocina',650,0,350,400],['pasillo',0,400,1000,120],['dormitorio',0,520,300,280],['dormitorio',300,520,300,280],['dormitorio',600,520,250,280],['bano',850,520,150,280]],persons:3},
   estudio:{n:'Estudio (35 m²)',rooms:[['vestibulo',0,0,150,200],['salon',150,0,400,300],['cocina',550,0,200,300],['dormitorio',0,300,300,250],['bano',300,300,150,250]],persons:2},
   completo:{n:'Piso con climatización y gas',rooms:[['vestibulo',0,0,200,400],['salon',200,0,450,400],['cocina',650,0,350,400],['pasillo',0,400,1000,120],['dormitorio',0,520,300,280],['dormitorio',300,520,300,280],['bano',600,520,200,280],['terraza',1000,0,200,400]],persons:4,extra:true}
 };
-function loadHouse(key){const t=HTPL[key],h=newHouse();h.persons=t.persons;let n=0;
-  t.rooms.forEach(([type,x,y,w,hh])=>{n++;const same=h.rooms.filter(r=>r.type===type).length;h.rooms.push({id:uid(),type,x,y,w,h:hh,name:RT[type].split(' /')[0]+(same||type==='dormitorio'?' '+(same+1):'')})});
-  h.w=Math.max(...h.rooms.map(r=>r.x+r.w))+100;h.h=Math.max(...h.rooms.map(r=>r.y+r.h))+100;
+function loadHouse(key){const t=HTPL[key],h=newHouse();h.persons=t.persons;let n=0;h.nf=t.nf||1;h.fn=t.fn||['Planta baja'];
+  t.rooms.forEach(([type,x,y,w,hh,fl])=>{n++;const same=h.rooms.filter(r=>r.type===type).length;h.rooms.push({id:uid(),type,x,y:y+(fl||0)*FY,w,h:hh,name:RT[type].split(' /')[0]+(same||type==='dormitorio'?' '+(same+1):'')})});
+  const pd=planDims(h);h.w=pd.w+100;h.h=pd.h+100;
   autoEquip(h);
   if(t.extra){const r=k=>h.rooms.find(x=>x.type===k),sal=r('salon'),coc=r('cocina'),ter=r('terraza');
     const put=(k,x,y,e)=>h.items.push({id:uid(),k,x,y,...(e||{})});
