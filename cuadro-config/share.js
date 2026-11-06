@@ -10,6 +10,7 @@ async function unzipStr(code){const t=code[0],bytes=ub64u(code.slice(1));
   if(t==='z'){if(typeof DecompressionStream!=='function')throw new Error('Tu navegador no puede abrir este código comprimido.');const ds=new DecompressionStream('deflate-raw'),w=ds.writable.getWriter();w.write(bytes);w.close();return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer())}
   return new TextDecoder().decode(bytes)}
 function projectPack(p){p=p||P();const defIds=new Set(DEFAULT_CATALOG.map(x=>x.id)),defEnc=new Set(ENCLOSURES.map(x=>x.id));
+  if(p.house&&p.house.bg){p=structuredClone(p);delete p.house.bg}
   return{v:1,app:'CuadroConfig',project:p,catalogExtra:S.catalog.filter(x=>!defIds.has(x.id)),catalogEdits:S.catalog.filter(x=>defIds.has(x.id)).map(x=>({id:x.id,price:x.price})).filter(x=>{const d=DEFAULT_CATALOG.find(y=>y.id===x.id);return d&&d.price!==x.price}),enclExtra:S.enclosures.filter(x=>!defEnc.has(x.id))}}
 async function projectCode(p){return 'CC1:'+await zipStr(JSON.stringify(projectPack(p)))}
 function projectUnpack(o){if(!o||o.app!=='CuadroConfig'||!o.project||!o.project.boards)throw new Error('El contenido no es un proyecto de CuadroConfig.');
