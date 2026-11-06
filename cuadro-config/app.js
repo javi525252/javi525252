@@ -244,9 +244,9 @@ function render(){
   const proj=P();
   $('#proj').innerHTML=S.projects.map((p,i)=>`<option value="${i}" ${i===S.cur?'selected':''}>${esc(p.name)}</option>`).join('');
   $('#proj').onchange=e=>{S.cur=+e.target.value;selId=null;render()};
-  const tabs=[['asistente','Asistente'],['casa','Casa (plano)'],['logo','Domótica (autómata)'],['design','Cuadro'],['diagram','Esquema unifilar'],['encl','Envolvente'],['m3d','Montaje 3D'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
+  const tabs=[['asistente','Asistente'],['compra','Lista de compra'],['guardar','Guardar / compartir'],['casa','Casa (plano)'],['logo','Domótica (autómata)'],['design','Cuadro'],['diagram','Esquema unifilar'],['encl','Envolvente'],['m3d','Montaje 3D'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
   $('#nav').innerHTML=tabs.map(([k,n])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
-  const f={asistente:vAsistente,logo:vLogo,casa:vCasa,design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,m3d:vM3D,project:vProject}[tab];
+  const f={compra:vCompra,guardar:vGuardar,asistente:vAsistente,logo:vLogo,casa:vCasa,design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,m3d:vM3D,project:vProject}[tab];
   $('#app').innerHTML=boardBar()+f();
   if(tab==='design')wireDnD();
   if(tab==='m3d')M3D.mount();
@@ -255,7 +255,7 @@ function render(){
 }
 window.go=t=>{tab=t;render()};
 function boardBar(){
-  if(['catalog','project','casa','logo','asistente'].includes(tab))return'';
+  if(['catalog','project','casa','logo','asistente','compra','guardar'].includes(tab))return'';
   const p=P();
   return`<div class="bar noprint"><b>Cuadro:</b>${p.boards.map((b,i)=>`<button class="b ${i===p.cur?'':'s'}" onclick="P().cur=${i};selId=null;render()">${esc(b.name)}</button>`).join('')}
   <button class="b s" onclick="addBoard()">+ Cuadro</button><button class="b s" onclick="dupBoard()">Duplicar</button><button class="b s" onclick="delBoard()">Eliminar</button></div>`;
@@ -454,11 +454,11 @@ function vReport(){
   const draw=p.boards.map((b,bi)=>{if(!b.root)return'';const sv=p.cur;p.cur=bi;let d='',e='';try{d=vDiagram();e=vEncl()}finally{p.cur=sv}
     d=d.replace(/<p class="muted noprint">.*?<\/button>/s,'').replace(/<svg width="(\d+)" height="(\d+)"/,'<svg viewBox="0 0 $1 $2" style="width:100%;height:auto"');
     e=e.replace(/<div class="bar"><label style="margin:0">Envolvente:.*?<\/select><\/div>/s,'').replace(/<svg width="(\d+)" height="(\d+)"/,'<svg viewBox="0 0 $1 $2" style="width:100%;max-width:'+'900px;height:auto"');return d+e}).join('');
-  return head+plan+chk+hcard+circ+`<div class="pb"></div>`+boards+draw+aut+`
+  return head+plan+chk+hcard+circ+`<div class="pb"></div>`+boards+draw+aut+(typeof compraHTML==='function'?'<div class="pb"></div>'+compraHTML(true):'')+`
   <div class="card"><h3>Resumen económico</h3><table><tr><td>Material</td><td class="r">${eur(t.matNet)}</td></tr><tr><td>Pequeño material + montaje</td><td class="r">${eur(t.aux+t.labor)}</td></tr><tr><td>Margen</td><td class="r">${eur(t.mg)}</td></tr><tr class="tot"><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${p.vat}%</td><td class="r">${eur(t.vat)}</td></tr><tr class="tot"><td>TOTAL</td><td class="r">${eur(t.total)}</td></tr></table>
   <p class="muted" style="font-size:12px">Cálculos orientativos. Verificar por técnico competente conforme al REBT, CTE, reglamento de gas e IEC 61439 antes de fabricar o instalar.</p></div>`;
 }
-S=load();render();
+S=load();render();if(typeof shareBoot==='function')shareBoot();
 
 // ---------- corrección automática de calibres ----------
 window.fixSizes=()=>{const b=B();if(!b.root)return;const a=analyze(b);let n=0,fail=0;

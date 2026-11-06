@@ -1,0 +1,28 @@
+'use strict';
+/* Lista de compra: todo el material del proyecto agrupado por categoría y proveedor */
+const COMPRA_CATS=['Aparamenta del cuadro','Envolventes','Mecanismos y puntos eléctricos','Cable y tubo (metros)','Telecomunicaciones y seguridad','Domótica y automatización','Climatización y agua caliente','Fontanería y sanitarios','Gas'];
+const COMPRA_SUP0={'Aparamenta del cuadro':'Almacén eléctrico','Envolventes':'Almacén eléctrico','Mecanismos y puntos eléctricos':'Almacén eléctrico','Cable y tubo (metros)':'Almacén eléctrico','Telecomunicaciones y seguridad':'Telecomunicaciones','Domótica y automatización':'Domótica','Climatización y agua caliente':'Climatización','Fontanería y sanitarios':'Fontanería','Gas':'Instalador de gas'};
+const DOMO_K=['dom','persiana','sensor_luz','sensor_temp','sensor_viento','sensor_lluvia','contacto_ventana','electrovalvula'];
+function matCat(l){const p=l.p,id=String(p.id||'');
+  if(p.kind==='enc')return'Envolventes';if(p.kind==='cable')return'Cable y tubo (metros)';
+  if(id.startsWith('lg_'))return'Domótica y automatización';
+  if(p.kind==='house'){if(id==='h_tubo'||id==='h_tel')return id==='h_tel'?'Telecomunicaciones y seguridad':'Cable y tubo (metros)';
+    if(id.startsWith('h_pipe'))return id.includes('gas')?'Gas':'Fontanería y sanitarios';if(id.startsWith('h_suelo_'))return'Climatización y agua caliente';
+    const k=id.slice(2),d=HI[k];if(d){if(DOMO_K.includes(k))return'Domótica y automatización';return({ele:'Mecanismos y puntos eléctricos',tel:'Telecomunicaciones y seguridad',cli:'Climatización y agua caliente',agu:'Fontanería y sanitarios',gas:'Gas'})[d.cat]}return'Cable y tubo (metros)'}
+  return'Aparamenta del cuadro'}
+const supOf=c=>{const p=P();return(p.suppliers&&p.suppliers[c])||COMPRA_SUP0[c]};
+window.cpSup=(c,v)=>{const p=P();p.suppliers=p.suppliers||{};p.suppliers[c]=v||COMPRA_SUP0[c];render()};
+function compraData(){const t=budget(P()),cats={};t.lines.forEach(l=>{const c=matCat(l);(cats[c]=cats[c]||[]).push(l)});
+  const sup={};COMPRA_CATS.forEach(c=>{if(!cats[c])return;const s=supOf(c);(sup[s]=sup[s]||{lines:[],cats:new Set()});sup[s].cats.add(c);cats[c].forEach(l=>sup[s].lines.push({...l,cat:c}))});
+  Object.values(sup).forEach(s=>{s.lines.sort((a,b)=>a.cat.localeCompare(b.cat)||a.p.name.localeCompare(b.p.name));s.total=s.lines.reduce((x,l)=>x+l.tot,0)});return{sup,cats,t}}
+function compraText(name,s){return`PEDIDO · ${P().name} · ${name}\n`+s.lines.map(l=>`- ${l.qty} × ${l.p.name}`).join('\n')+`\nTotal estimado (sin IVA): ${eur(s.total)}`}
+window.cpCopy=async name=>{const {sup}=compraData();const txt=name==='*'?Object.entries(sup).map(([n,s])=>compraText(n,s)).join('\n\n'):compraText(name,sup[name]);const ok=await copyText(txt);const el=document.getElementById('cp-msg');if(el)el.innerHTML=`<div class="chk ${ok?'ok':'warn'}">${ok?'Lista copiada: pégala en un mensaje o correo.':'No se pudo copiar solo; usa el cuadro de texto.'}</div>`};
+window.cpCsv=()=>{const {sup}=compraData(),q=s=>'"'+String(s).replace(/"/g,'""')+'"',rows=[['Proveedor','Categoría','Descripción','Cantidad','Precio ud.','Importe']];Object.entries(sup).forEach(([n,s])=>s.lines.forEach(l=>rows.push([n,l.cat,l.p.name,l.qty,l.unit.toFixed(2),l.tot.toFixed(2)])));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+rows.map(r=>r.map(q).join(';')).join('\n')],{type:'text/csv'}));a.download='lista-de-compra.csv';a.click()};
+function compraHTML(rep){const {sup,cats,t}=compraData(),names=Object.keys(sup);if(!names.length)return'<div class="card muted">Todavía no hay material en el proyecto. Usa el asistente o coloca elementos en el plano.</div>';
+  const supBar=!rep?`<div class="card"><h3>Proveedores</h3><p class="muted" style="font-size:12.5px;margin:0 0 6px">Cada categoría se compra a un proveedor; cambia el nombre y se reagrupa la lista.</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px">${COMPRA_CATS.filter(c=>cats[c]).map(c=>`<div><label>${c}</label><input value="${esc(supOf(c))}" style="width:100%" onchange="cpSup('${c}',this.value)"></div>`).join('')}</div></div>`:'';
+  const body=names.map(n=>{const s=sup[n];return`<div class="card" style="${rep?'break-inside:avoid':''}"><h3>${esc(n)} <small class="muted">· ${[...s.cats].join(', ')}</small></h3><table><tr><th>Descripción</th><th class="r">Cant.</th><th class="r">Precio ud.</th><th class="r">Importe</th></tr>${s.lines.map(l=>`<tr><td>${esc(l.p.name)}</td><td class="r">${l.qty}</td><td class="r">${eur(l.unit)}</td><td class="r">${eur(l.tot)}</td></tr>`).join('')}<tr class="tot"><td colspan="3">Total ${esc(n)} (sin IVA)</td><td class="r">${eur(s.total)}</td></tr></table>${rep?'':`<div class="bar noprint" style="margin-top:8px"><button class="b s" onclick="cpCopy('${esc(n).replace(/'/g,"\\'")}')">Copiar pedido de ${esc(n)}</button></div>`}</div>`}).join('');
+  const sum=`<div class="card"><h3>Resumen por proveedor</h3><table>${names.map(n=>`<tr><td>${esc(n)}</td><td class="r">${sup[n].lines.length} líneas</td><td class="r"><b>${eur(sup[n].total)}</b></td></tr>`).join('')}<tr class="tot"><td>Material total (con tarifa y descuento)</td><td></td><td class="r">${eur(names.reduce((x,n)=>x+sup[n].total,0))}</td></tr></table>
+    ${!rep?`<div class="bar noprint" style="margin-top:8px"><button class="b" onclick="cpCopy('*')">Copiar todos los pedidos</button>${ART()?'':'<button class="b s" onclick="cpCsv()">Descargar CSV</button>'}</div><div id="cp-msg" style="margin-top:6px"></div>`:''}</div>`;
+  return supBar+sum+body}
+function vCompra(){return compraHTML(false)+'<textarea id="cp-txt" style="position:fixed;left:-9999px;top:0"></textarea>'}
