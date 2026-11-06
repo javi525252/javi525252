@@ -230,12 +230,14 @@ function bom(proj){
 }
 function budget(proj){
   const bm=bom(proj),k=PRICELISTS[proj.list]?.k||1;
-  const lines=bm.rows.map(r=>({...r,unit:r.p.price*k,tot:r.p.price*k*r.qty}));
+  const ov=proj.priceOv||{},si=proj.supInfo||{};
+  const lines=bm.rows.map(r=>{const cat=typeof matCat==='function'?matCat(r):null,sup=cat?((proj.suppliers&&proj.suppliers[cat])||COMPRA_SUP0[cat]):null,inf=(sup&&si[sup])||{},base=r.p.price*k,hasOv=ov[r.p.id]!==undefined,unit=hasOv?ov[r.p.id]:base*(1-(inf.tariff||0)/100);
+    return{...r,cat,sup,base,hasOv,unit,tot:unit*r.qty,mpct:(inf.margin!==undefined&&inf.margin!==''&&inf.margin!==null)?+inf.margin:null}});
   const mat=lines.reduce((s,l)=>s+l.tot,0),disc=mat*proj.discount/100,matNet=mat-disc;
   const auxAvg=proj.boards.length?proj.boards.reduce((s,b)=>s+b.aux,0)/proj.boards.length:0;
   const aux=matNet*auxAvg/100;
   const hours=proj.boards.reduce((s,b)=>s+analyze(b).mods.reduce((t,m)=>t+m.p.mod,0)*b.hours,0);
-  const labor=hours*proj.rate,sub=matNet+aux+labor,mg=sub*proj.margin/100,base=sub+mg,vat=base*proj.vat/100;
+  const labor=hours*proj.rate,sub=matNet+aux+labor,dk=1-proj.discount/100,mg=lines.reduce((s,l)=>s+l.tot*dk*(l.mpct!==null?l.mpct:proj.margin)/100,0)+(aux+labor)*proj.margin/100,base=sub+mg,vat=base*proj.vat/100;
   return{lines,mat,disc,matNet,aux,hours,labor,sub,mg,base,vat,total:base+vat,mods:bm.mods,ok:bm.ok};
 }
 // ---------- UI ----------

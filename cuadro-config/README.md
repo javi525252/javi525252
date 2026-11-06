@@ -75,3 +75,9 @@ Nuevos elementos (pestaña «Casa (plano)»): **persiana motorizada**, **electro
 ## Guardar, compartir y lista de compra
 - **Guardar / compartir:** código de texto comprimido (`CC1:…`, unos 4 KB para una casa completa) para copiar y pegar en cualquier sitio, **enlace compartible** (la versión de Netlify abre el proyecto como copia nueva al entrar), descarga y apertura de archivos `.cuadroconfig.json`, y lista de proyectos con renombrar, duplicar y borrar. El código incluye plano, cuadros, autómata y los cambios del catálogo.
 - **Lista de compra:** todo el material (aparamenta, envolventes, mecanismos, cables y tubos, telecomunicaciones, domótica, climatización, fontanería y gas) agrupado por categoría y **por proveedor**, con nombre editable. Cada proveedor tiene su pedido con cantidades y total, que se copia con un botón o se descarga en CSV. También aparece en el informe.
+
+## Condiciones por proveedor
+- **Tarifa propia (% descuento), margen (%), plazo de entrega (días) y notas** por proveedor. El presupuesto aplica el descuento de tarifa, el margen propio de cada proveedor (si no, el general) y permite fijar a mano el precio de cualquier artículo (↺ para volver al de catálogo).
+- **Plan de pedidos:** indicando la fecha de inicio de obra, calcula "Pedir antes del" para cada proveedor según su plazo. Aparece también en el informe.
+- **Pegar tarifa:** una línea por artículo con `parte del nombre ; precio`.
+- Los pedidos copiados y el CSV incluyen el plazo. Todo viaja dentro del código `CC1:` del proyecto.
