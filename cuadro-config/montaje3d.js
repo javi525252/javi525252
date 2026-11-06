@@ -304,6 +304,9 @@ function mkHouseItem(it,d,room,H){
   else if(k==='persiana'){wm(100,6,3,0xdfe6ea,0,58,1);wm(100,6,3,0xdfe6ea,0,-58,1);wm(6,116,3,0xdfe6ea,-50,0,1);wm(6,116,3,0xdfe6ea,50,0,1);const gl2=new THREE.Mesh(new THREE.PlaneGeometry(94,110),new THREE.MeshBasicMaterial({color:0xcfe8ff,transparent:true,opacity:0.5}));gl2.position.z=1.2;g.add(gl2);
     const sh=new THREE.Group();sh.position.set(0,56,2.5);g.add(sh);box(94,110,2.6,0x8d6e63,0,-55,0,sh);for(let i=0;i<8;i++)box(94,1,3,0x6d4c41,0,-8-i*13,0,sh,false);upd=c=>{sh.scale.y=Math.max(0.03,(c.pos||0)/100)}}
   else if(k==='electrovalvula'){wall=false;wm(12,10,14,0x2e7d32,0,6,0);cyl(5,5,12,0x1b5e20,0,16,0,g);const j=jet(0,20,16,22);upd=c=>{j.visible=!!c.run}}
+  else if(k==='sensor_lluvia'){wall=false;wm(10,6,10,0xf5f5f5,0,0,0);const j=jet(0,12,0,18);upd=c=>{j.visible=!!c.sw}}
+  else if(k==='sensor_viento'){wall=false;cyl(1.5,1.5,40,0x9aa0a6,0,20,0,g);const ar=new THREE.Group();ar.position.set(0,42,0);g.add(ar);[0,1,2].forEach(i=>{const a2=i*Math.PI*2/3,cp=new THREE.Mesh(new THREE.SphereGeometry(3,8,6),MAT(0xe0e0e0));cp.position.set(Math.cos(a2)*9,0,Math.sin(a2)*9);ar.add(cp)});upd=c=>{ar.rotation.y+=c.dt*(c.val||0)*0.15}}
+  else if(k==='contacto_ventana'){wm(40,50,2,0xdfe6ea,0,0,1);const sash=new THREE.Group();sash.position.set(-20,0,2);g.add(sash);box(40,46,1.5,0xbfd9ee,20,0,0,sash,false);upd=c=>{sash.rotation.y=c.sw?-1.1:0}}
   else if(k==='sensor_luz'){wm(8,8,5,0xf5f5f5,0,0,2.5);const sun=new THREE.Mesh(new THREE.SphereGeometry(3,10,8),new THREE.MeshBasicMaterial({color:0xffc107}));sun.position.set(0,0,6);g.add(sun)}
   else if(k==='sensor_temp'){wm(6,12,4,0xf5f5f5,0,0,2);cyl(1.2,1.2,8,0xe53935,0,0,4.5,g,'z',8)}
   else if(k==='llave'||k==='cont_agua'){wm(14,14,10,k==='llave'?0x1565c0:0x90caf9,0,0,5);cyl(4,4,6,0xb0bec5,0,0,12,g,'z')}
@@ -370,7 +373,7 @@ function visuals(t,dt){
     d.userData.led.material.color.setHex(col);
     d.userData.body.material.color.setHex(st.destroyed?0x3a3330:sel?0xbfe8d0:0xd3d9de);
     if(S.fault&&S.fault.id===it.n.id)d.userData.led.scale.setScalar(1+0.6*Math.abs(Math.sin(t*10)))});
-  if(R.hitems&&SIMH.m)R.hitems.forEach(hi=>{const live=hsLive(hi.circ),m=SIMH.m;hi.upd({live,t,dt,pos:SIMH.blind[hi.id]||0,run:hsRun(hi.item),plug:SIMH.plug[hi.id]||'',sw:!!SIMH.sw[hi.id],lit:(hi.k==='luz'||hi.k==='foco')?(live&&lightOn(m,hi.item)):false,br:(hi.k==='luz'||hi.k==='foco')?brightness(m,hi.item):1,latch:!!SIMH.latch[(roomAt(m.h,hi.item.x,hi.item.y)||{}).id],dimv:SIMH.dim[hi.id]||100,ring:SIMH.ring[hi.id]!==undefined&&SIMH.t-SIMH.ring[hi.id]<2,anyTrip:Object.keys(SIMH.trip).some(k=>SIMH.trip[k]),on:SIMH.main,ext:()=>m.h.items.some(i=>i.k==='split_i'&&SIMH.run[i.id]&&hsLive(itemCode(m,i)))})});
+  if(R.hitems&&SIMH.m)R.hitems.forEach(hi=>{const live=hsLive(hi.circ),m=SIMH.m;hi.upd({live,t,dt,val:HI[hi.k].an?hsVal(hi.item):0,pos:SIMH.blind[hi.id]||0,run:hsRun(hi.item),plug:SIMH.plug[hi.id]||'',sw:!!SIMH.sw[hi.id],lit:(hi.k==='luz'||hi.k==='foco')?(live&&lightOn(m,hi.item)):false,br:(hi.k==='luz'||hi.k==='foco')?brightness(m,hi.item):1,latch:!!SIMH.latch[(roomAt(m.h,hi.item.x,hi.item.y)||{}).id],dimv:SIMH.dim[hi.id]||100,ring:SIMH.ring[hi.id]!==undefined&&SIMH.t-SIMH.ring[hi.id]<2,anyTrip:Object.keys(SIMH.trip).some(k=>SIMH.trip[k]),on:SIMH.main,ext:()=>m.h.items.some(i=>i.k==='split_i'&&SIMH.run[i.id]&&hsLive(itemCode(m,i)))})});
   R.loads.forEach(l=>{const n=l.it.n,live=!!(fl.live[n.id]&&S.on),st=S.fault&&S.fault.id===n.id?S.fault:null;
     const stall=!!(st&&st.opt&&st.opt.rotor&&live),phase=!!(st&&st.opt&&st.opt.phase&&live),ref=l.it.i.amp||0;
     l.upd({live:live&&!S.burn[n.id],t,dt,n,stall,phase,ratio:ref?(fl.I[n.id]||0)/ref:0});

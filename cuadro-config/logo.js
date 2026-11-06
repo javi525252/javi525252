@@ -21,11 +21,11 @@ const LGT={
 };
 const LGQT={lamp:'Lámpara',heater:'Calefactor',pump:'Bomba / riego',siren:'Sirena',lock:'Cerradura',fan:'Ventilador',blind_up:'Persiana · subir',blind_down:'Persiana · bajar',generic:'Otro'};
 const LGDAYS=['Lu','Ma','Mi','Ju','Vi','Sá','Do'];
-const LG={run:true,speed:1,t:0,clock:8*3600,I:{},AI:{AI1:5,AI2:20},out:{},st:{},Q:{},blind:0,blindFault:false,sel:null,wire:null,drag:null,sig:'',ex:null,tm:null};
+const LG={run:true,speed:1,t:0,clock:8*3600,I:{},AI:{AI1:5,AI2:20,AI3:10},out:{},st:{},Q:{},blind:0,blindFault:false,sel:null,wire:null,drag:null,sig:'',ex:null,tm:null};
 function lgNew(){const ins={},q={};for(let i=1;i<=8;i++)ins['I'+i]={n:['Pulsador 1','Pulsador 2','Interruptor 3','Sensor de puerta','Llave de armado','Entrada 6','Entrada 7','Entrada 8'][i-1],t:i<=2?'push':'sw'};
   const qt=['lamp','lamp','blind_up','blind_down','heater','pump','siren','lock'],qn=['Luz 1','Luz 2','Persiana subir','Persiana bajar','Calefacción','Riego','Sirena','Cerradura'];for(let i=1;i<=8;i++)q['Q'+i]={n:qn[i-1],t:qt[i-1],kw:[0.1,0.1,0.25,0.25,1.5,0.4,0.1,0.02][i-1]};
-  return{link:{},ins,ai:{AI1:{n:'Luz exterior',min:0,max:10,u:'V'},AI2:{n:'Temperatura',min:0,max:40,u:'°C'}},q,blocks:[],qin:{},nid:1}}
-const lgProg=()=>{const p=P();if(!p.logo)p.logo=lgNew();if(!p.logo.link)p.logo.link={};return p.logo};
+  return{link:{},ins,ai:{AI1:{n:'Luz exterior',min:0,max:10,u:'V'},AI2:{n:'Temperatura',min:0,max:40,u:'°C'},AI3:{n:'Viento',min:0,max:100,u:'km/h'}},q,blocks:[],qin:{},nid:1}}
+const lgProg=()=>{const p=P();if(!p.logo)p.logo=lgNew();if(!p.logo.link)p.logo.link={};if(!p.logo.ai.AI3)p.logo.ai.AI3={n:'Viento',min:0,max:100,u:'km/h'};if(LG.AI.AI3===undefined)LG.AI.AI3=10;return p.logo};
 const hm=s=>{const [h,m]=String(s).split(':').map(Number);return (h||0)*60+(m||0)};
 function lgVal(r){if(!r)return null;if(r==='hi')return 1;if(r==='lo')return 0;if(/^I\d/.test(r))return LG.I[r]?1:0;if(/^AI/.test(r))return LG.AI[r];return LG.out[r]||0}
 function lgEval(g,dt){LG.t+=dt;LG.clock=(LG.clock+dt)%(7*86400);
@@ -81,7 +81,7 @@ function vLogo(){
   const ex=Object.entries(LGEX).map(([k,e])=>`<option value="${k}" ${g.ex===k?'selected':''}>${e.n}</option>`).join('');
   return`<div class="bar noprint"><select onchange="if(this.value)lgLoad(this.value)"><option value="">Cargar programa de ejemplo…</option>${ex}</select><button class="b s" onclick="if(confirm('¿Borrar el programa?')){P().logo=lgNew();LG.st={};LG.out={};render()}">Borrar programa</button>
    <button class="b ${LG.run?'':'d'}" onclick="LG.run=!LG.run;render()">${LG.run?'⏸ Pausar':'▶ Ejecutar'}</button><label style="margin:0">Velocidad</label><select onchange="LG.speed=+this.value;render()">${[1,5,30,120,600].map(v=>`<option value="${v}" ${LG.speed===v?'selected':''}>×${v}</option>`).join('')}</select>
-   <button class="b" style="background:#6a1b9a" onclick="lgHouseDemo()">🏠 Demo: casa domotizada</button><button class="b" style="background:#6a1b9a" onclick="lgHouseDemo2()">🌿 Demo: persiana, riego y clima</button><span class="muted">Autómata programable tipo LOGO!: programa el esquema de funciones y pruébalo en directo.</span></div>
+   <button class="b" style="background:#6a1b9a" onclick="lgHouseDemo()">🏠 Demo: casa domotizada</button><button class="b" style="background:#6a1b9a" onclick="lgHouseDemo2()">🌿 Demo: persiana, riego y clima</button><button class="b" style="background:#6a1b9a" onclick="lgHouseDemo3()">🌦 Demo: estación meteorológica</button><span class="muted">Autómata programable tipo LOGO!: programa el esquema de funciones y pruébalo en directo.</span></div>
   <div class="card noprint" style="padding:8px"><div style="font-weight:600;margin-bottom:4px">Bloques (toca para añadir)</div><div style="display:flex;flex-wrap:wrap;gap:5px">${pal}</div></div>
   <div class="gc"><div class="card m-center" style="padding:6px;align-self:start"><div style="overflow:auto;max-height:86vh;border:1px solid var(--bd);border-radius:6px"><svg id="lg-svg" viewBox="0 0 1000 640" style="width:100%;min-width:760px;height:auto;background:#fff;touch-action:none;display:block"><g id="lg-g"></g></svg></div>
     <p class="muted" style="font-size:12.5px;margin:6px 4px 0">Para unir: toca el <b>círculo de salida</b> (derecha de una entrada I, un bloque o un valor fijo) y después el <b>círculo de entrada</b> de otro bloque o de Q. Toca una conexión ya hecha para quitarla. Verde = señal activa.</p></div>
@@ -165,13 +165,13 @@ window.lgAdd=t=>{const g=lgProg(),def=LGT[t],n=g.blocks.length;let id;do{id='B'+
 window.lgDel=id=>{const g=lgProg();g.blocks=g.blocks.filter(b=>b.id!==id);g.blocks.forEach(b=>b.in=b.in.map(r=>r===id?null:r));Object.keys(g.qin).forEach(q=>{if(g.qin[q]===id)g.qin[q]=null});LG.sel=null;render()};
 window.lgPress=(k,v)=>{const d=lgProg().ins[k];if(!d)return;if(d.t==='push')LG.I[k]=v;else if(v)LG.I[k]=!LG.I[k];lgRefresh(true)};
 // ---------- dibujo ----------
-function lgDraw(){const g=lgProg(),el=document.getElementById('lg-g');if(!el)return;let s='';
+function lgBuild(){const g=lgProg();let s='';
   const wire=(a,b,on)=>{const dx=Math.max(40,(b.x-a.x)/2);return`<path d="M${a.x} ${a.y}C${a.x+dx} ${a.y} ${b.x-dx} ${b.y} ${b.x} ${b.y}" fill="none" stroke="${on?'#2e9e4f':'#9aa7b0'}" stroke-width="${on?4:3}" ${on?'':'stroke-dasharray=""'} opacity=".9"/>`};
   const links=[];g.blocks.forEach(b=>b.in.forEach((r,i)=>{if(r)links.push({from:r,to:{b,i}})}));Object.keys(g.qin).forEach(q=>{if(g.qin[q])links.push({from:g.qin[q],to:{q}})});
   links.forEach(l=>{const a=lgOutPin(l.from);if(!a)return;const bpin=l.to.q?{x:QX,y:qY(+l.to.q.slice(1))+17}:lgInPin(l.to.b,l.to.i);s+=`<g data-wire="${l.to.q?'q:'+l.to.q:'b:'+l.to.b.id+':'+l.to.i}" style="cursor:pointer">${wire(a,bpin,!!lgVal(l.from))}<path d="M${a.x} ${a.y}L${bpin.x} ${bpin.y}" stroke="transparent" stroke-width="14" fill="none"/></g>`});
   const pin=(x,y,id,kind,on,pend)=>`<circle cx="${x}" cy="${y}" r="9" fill="${pend?'#ffd54f':on?'#2e9e4f':'#fff'}" stroke="#37474f" stroke-width="2.5" data-pin="${kind}:${id}" style="cursor:crosshair"/>`;
   for(let n=1;n<=8;n++){const k='I'+n,d=g.ins[k],v=!!LG.I[k];s+=`<g data-in="${k}" style="cursor:pointer"><rect x="0" y="${inY(n)}" width="${NODE_W}" height="34" rx="6" fill="${v?'#dff5e3':'#f3f5f7'}" stroke="${LG.sel===k?'#0b7a4b':'#37474f'}" stroke-width="${LG.sel===k?4:2}"/><text x="8" y="${inY(n)+15}" font-size="13" font-weight="800" fill="#263238">${k}</text><text x="8" y="${inY(n)+28}" font-size="10.5" fill="#556">${esc(d.n).slice(0,15)}</text><text x="70" y="${inY(n)+15}" font-size="11" fill="${v?'#2e7d32':'#889'}">${v?'1':'0'}</text></g>${pin(NODE_W,inY(n)+17,k,'o',v,LG.wire===k)}`}
-  [1,2].forEach(i=>{const k='AI'+i,a=g.ai[k];s+=`<g data-in="${k}"><rect x="0" y="${aiY(i)}" width="${NODE_W}" height="34" rx="6" fill="#eef6fb" stroke="${LG.sel===k?'#0b7a4b':'#37474f'}" stroke-width="2"/><text x="8" y="${aiY(i)+15}" font-size="13" font-weight="800" fill="#263238">${k}</text><text x="8" y="${aiY(i)+28}" font-size="10.5" fill="#556">${esc(a.n)} ${(+LG.AI[k]).toFixed(1)}${a.u}</text></g>${pin(NODE_W,aiY(i)+17,k,'o',false,LG.wire===k)}`});
+  [1,2,3].forEach(i=>{const k='AI'+i,a=g.ai[k];s+=`<g data-in="${k}"><rect x="0" y="${aiY(i)}" width="${NODE_W}" height="34" rx="6" fill="#eef6fb" stroke="${LG.sel===k?'#0b7a4b':'#37474f'}" stroke-width="2"/><text x="8" y="${aiY(i)+15}" font-size="13" font-weight="800" fill="#263238">${k}</text><text x="8" y="${aiY(i)+28}" font-size="10.5" fill="#556">${esc(a.n)} ${(+LG.AI[k]).toFixed(1)}${a.u}</text></g>${pin(NODE_W,aiY(i)+17,k,'o',false,LG.wire===k)}`});
   [['hi',150,'1 (alto)'],['lo',250,'0 (bajo)']].forEach(([k,x,l])=>{s+=`<rect x="${x-50}" y="578" width="100" height="34" rx="6" fill="#f3f5f7" stroke="#37474f" stroke-width="2"/><text x="${x-42}" y="600" font-size="12" font-weight="700" fill="#263238">${l}</text>${pin(x+50,595,k,'o',k==='hi',LG.wire===k)}`});
   for(let n=1;n<=8;n++){const k='Q'+n,d=g.q[k],v=!!LG.Q[k];s+=`<g data-q="${k}" style="cursor:pointer"><rect x="${QX}" y="${qY(n)}" width="100" height="34" rx="6" fill="${v?'#dff5e3':'#f3f5f7'}" stroke="${LG.sel===k?'#0b7a4b':'#37474f'}" stroke-width="${LG.sel===k?4:2}"/><text x="${QX+12}" y="${qY(n)+15}" font-size="13" font-weight="800" fill="#263238">${k} <tspan fill="${v?'#2e7d32':'#889'}">${v?'ON':'off'}</tspan></text><text x="${QX+12}" y="${qY(n)+28}" font-size="10.5" fill="#556">${esc(d.n).slice(0,14)}</text></g>${pin(QX,qY(n)+17,k,'i',v,false)}`}
   g.blocks.forEach(b=>{const def=LGT[b.t],h=blockH(b),v=!!LG.out[b.id],st=LG.st[b.id]||{};let info='';
@@ -179,7 +179,10 @@ function lgDraw(){const g=lgProg(),el=document.getElementById('lg-g');if(!el)ret
     s+=`<g data-blk="${b.id}" style="cursor:move"><rect x="${b.x}" y="${b.y}" width="120" height="${h-8}" rx="8" fill="#fff" stroke="${LG.sel===b.id?'#0b7a4b':def.c}" stroke-width="${LG.sel===b.id?5:3}"/><rect x="${b.x}" y="${b.y}" width="120" height="22" rx="8" fill="${def.c}"/><text x="${b.x+8}" y="${b.y+15}" font-size="11.5" font-weight="800" fill="#fff">${def.n.slice(0,17)}</text><text x="${b.x+60}" y="${b.y+h-14}" text-anchor="middle" font-size="11" fill="#445">${info}</text><text x="${b.x+112}" y="${b.y+17}" text-anchor="end" font-size="10" fill="#fff" opacity=".8">${b.id}</text></g>`;
     (def.ins||[]).forEach((nm,i)=>{const p=lgInPin(b,i);s+=pin(p.x,p.y,b.id+':'+i,'i',false,false)+`<text x="${b.x+14}" y="${p.y+4}" font-size="11" fill="#445">${nm}</text>`});
     const po=lgOutPin(b.id);s+=pin(po.x,po.y,b.id,'o',v,LG.wire===b.id)});
-  el.innerHTML=s}
+  return s}
+function lgDraw(){const el=document.getElementById('lg-g');if(el)el.innerHTML=lgBuild()}
+function lgReportSVG(){const g=lgProg();if(!g.blocks.length&&!Object.values(g.qin).some(Boolean))return'';const sv={sel:LG.sel,wire:LG.wire};LG.sel=null;LG.wire=null;let s='';try{s=lgBuild()}finally{LG.sel=sv.sel;LG.wire=sv.wire}
+  return`<svg viewBox="0 0 1000 640" style="width:100%;height:auto;background:#fff;border:1px solid #ccd">${s}</svg>`}
 function lgMount(){const svg=document.getElementById('lg-svg');if(!svg)return;lgDraw();
   const pt=e=>{const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());return{x:q.x,y:q.y}};
   svg.onpointerdown=e=>{const t=e.target,g=lgProg();
@@ -240,7 +243,7 @@ function lgCheck(){const g=lgProg(),res=[],used=new Set();g.blocks.forEach(b=>b.
 window.lgDoCheck=()=>{LG.check=lgCheck();render()};
 
 // ---------- vínculo con la casa ----------
-const LGIN_K=['interruptor','conmutador','cruzamiento','pulsador','regulador','detector','sensor','timbre'];
+const LGIN_K=['interruptor','conmutador','cruzamiento','pulsador','regulador','detector','sensor','timbre','sensor_lluvia','contacto_ventana'];
 const LGOUT_K=['luz','foco','radiador','split_i','termo','suelo','extractor','toma_horno','toma_lav','toma_lvj','toma_sec'];
 function lgAnOf(it){const g=P().logo;if(!g||!g.link)return null;for(const k of Object.keys(g.link))if(/^AI/.test(k)&&g.link[k]==='item:'+it.id)return k;return null}
 function lgBlindQ(it){const g=P().logo,r={up:null,dn:null};if(!g||!g.link)return r;Object.keys(g.link).forEach(q=>{if(g.link[q]==='bup:'+it.id)r.up=q;if(g.link[q]==='bdn:'+it.id)r.dn=q});return r}
@@ -287,4 +290,20 @@ window.lgHouseDemo2=()=>{const h=HS();if(!h.rooms.length)return alert('Carga ant
   g.link={I1:'item:'+pb1.id,I2:'item:'+pb2.id,AI1:'item:'+sl.id,AI2:'item:'+st.id,Q3:'bup:'+per.id,Q4:'bdn:'+per.id,Q5:'item:'+rad.id,Q6:'item:'+ev.id};
   P().logo=g;LG.st={};LG.out={};LG.I={};LG.Q={};LG.run=true;LG.speed=1;hsInit();SIMH.val={};CS.sim=true;tab='casa';
   SIMH.ex={t:'Casa domotizada: persiana, riego y clima',s:['1. Sensor de luz (SL): baja su valor (pulsa el sensor o usa el deslizador) y la persiana BAJA sola al anochecer; sube al amanecer.','2. Pulsadores del plano: uno sube y otro baja la persiana a mano (con enclavamiento: nunca los dos motores a la vez).','3. Sensor de temperatura (ST): por debajo de 19 °C se enciende el calefactor del salón (Q5).','4. Riego (electroválvula): se abre cada día de 07:00 a 07:10 si hace menos de 28 °C. Cambia el reloj en «Domótica (autómata)».','5. Mira las salidas en el panel y la persiana moverse en el plano y en la Casa 3D.']};
+  hsAfterEdit();render()};
+
+window.lgHouseDemo3=()=>{const h=HS();if(!h.rooms.length)return alert('Carga antes una plantilla de casa en la pestaña «Casa (plano)».');
+  const withLight=h.rooms.filter(r=>h.items.some(i=>i.k==='luz'&&roomAt(h,i.x,i.y)===r)),sal=h.rooms.find(r=>r.type==='salon')||withLight[0],ter=h.rooms.find(r=>r.type==='terraza')||sal;
+  const get=(k,r)=>{let it=h.items.find(i=>i.k===k&&roomAt(h,i.x,i.y)===r&&!Object.values((P().logo&&P().logo.link)||{}).some(v=>v.endsWith(':'+i.id)));if(!it){const p=freeSpot(h,r,k);it={id:uid(),k,x:p.x,y:p.y};h.items.push(it)}return it};
+  const rain=get('sensor_lluvia',ter),wind=get('sensor_viento',ter),win=get('contacto_ventana',sal),per=get('persiana',sal),ev=get('electrovalvula',ter);
+  if(!h.items.some(i=>i.k==='llave')){const c=h.rooms.find(r=>r.type==='cocina')||sal,p=freeSpot(h,c,'llave');h.items.push({id:uid(),k:'llave',x:p.x,y:p.y})}
+  const g=lgNew();g.ins.I3.n='Sensor de lluvia';g.ins.I4.n='Ventana del salón abierta';g.ins.I3.t='sw';g.ins.I4.t='sw';g.ai.AI3.n='Viento (km/h)';
+  g.q.Q2.n='Luz de aviso';g.q.Q3={n:'Persiana subir',t:'blind_up',kw:0.25};g.q.Q6={n:'Riego jardín',t:'pump',kw:0.02};
+  const B=(id,t,x,y,ins,p)=>({id,t,x,y,in:ins,p:p||{}});
+  g.blocks=[B('B1','cmp',200,40,['AI3'],{th:50,hy:6,mode:'>'}),B('B2','week',200,200,[],{days:[1,1,1,1,1,1,1],on:'07:00',off:'07:10'}),B('B3','not',360,200,['I3']),B('B4','and',520,200,['B2','B3',null]),
+    B('B5','and',200,360,['I3','I4',null]),B('B6','flash',360,360,['B5'],{ton:0.5,toff:0.5})];
+  g.qin={Q3:'B1',Q6:'B4',Q2:'B6'};g.nid=10;
+  g.link={I3:'item:'+rain.id,I4:'item:'+win.id,AI3:'item:'+wind.id,Q3:'bup:'+per.id,Q6:'item:'+ev.id,Q2:'lights:'+sal.id};
+  P().logo=g;LG.st={};LG.out={};LG.I={};LG.Q={};LG.run=true;LG.speed=1;hsInit();SIMH.val={};CS.sim=true;tab='casa';
+  SIMH.ex={t:'Estación meteorológica de la casa',s:['1. Viento: sube el anemómetro por encima de 50 km/h (púlsalo o usa su deslizador) y la persiana SUBE sola para protegerse.','2. Lluvia: pulsa el sensor de lluvia. El riego programado (07:00–07:10) se anula si llueve.','3. Ventana abierta con lluvia: abre el contacto de la ventana del salón y pulsa lluvia: la luz del salón PARPADEA como aviso.','4. Cierra la ventana o para la lluvia y el aviso se apaga. Todo se programa en la pestaña «Domótica (autómata)».']};
   hsAfterEdit();render()};

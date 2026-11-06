@@ -42,7 +42,7 @@ svg text{font:11px system-ui}.muted{color:var(--mu)}
 .spin{transform-box:fill-box;transform-origin:center;animation:sp .6s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
 .pulse{animation:pl 1s ease-in-out infinite}@keyframes pl{50%{opacity:.35}}.drip{animation:dr .9s linear infinite}@keyframes dr{from{transform:translateY(-10px);opacity:1}to{transform:translateY(16px);opacity:0}}
 .chip{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--bd);border-radius:16px;background:#fff;cursor:pointer;font-size:12.5px}.chip.on{outline:2px solid var(--pr);background:var(--pr2)}
-@media print{header,nav,.noprint{display:none!important}body{background:#fff}.card{border:0;break-inside:avoid}}
+@media print{.pb{break-before:page}svg{max-width:100%}@page{size:A4;margin:12mm}header,nav,.noprint{display:none!important}body{background:#fff}.card{border:0;break-inside:avoid}}
 </style></head><body>
 <header><h1>Cuadro<span>Config</span></h1>
 <span class="muted" style="color:#9bb">Diseño y presupuesto de cuadros eléctricos</span>

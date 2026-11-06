@@ -61,3 +61,7 @@ En «Domótica (autómata)», toca una entrada I o una salida Q y elige **«Vinc
 
 ## Persianas, riego y sensores en el plano
 Nuevos elementos (pestaña «Casa (plano)»): **persiana motorizada**, **electroválvula de riego**, **sensor de luz** y **sensor de temperatura**. Se vinculan al autómata: los sensores alimentan las entradas analógicas AI1/AI2, y las salidas Q gobiernan «Persiana · SUBIR/BAJAR» y la electroválvula. Pulsa un sensor (o usa su deslizador) para cambiar el valor y ver cómo reacciona la casa; la persiana se mueve en 2D y en 3D, con aviso si se activan subir y bajar a la vez. El botón **«🌿 Demo: persiana, riego y clima»** monta un ejemplo completo (anochecer, calefactor por debajo de 19 °C y riego programado).
+
+## Más sensores e informe completo
+- **Sensores nuevos:** lluvia, anemómetro (viento) y contacto de ventana. El anemómetro es la entrada analógica AI3 del autómata; lluvia y ventana son entradas digitales vinculables. Demo **«🌦 Demo: estación meteorológica»**: con viento fuerte la persiana sube sola, la lluvia anula el riego y una ventana abierta con lluvia hace parpadear la luz de aviso.
+- **Informe completo (pestaña «Informe»):** portada con totales, **plano de la casa**, tarjeta «¿Está bien conectado?», validaciones de todas las instalaciones, circuitos, cuadros, **esquema del autómata** con sus entradas/salidas vinculadas, comprobación automática de combinaciones y resumen económico. En la versión de Netlify, «Imprimir / guardar PDF» genera el PDF (A4, con saltos de página).

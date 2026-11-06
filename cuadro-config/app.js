@@ -437,11 +437,23 @@ function vReport(){
     ${a.issues.map(i=>`<div class="chk ${i.lv}">${esc(i.msg)}</div>`).join('')}</div>`}).join('');
   const hs=p.house&&p.house.items.length?houseIssues(p.house):[];
   const hcard=hs.length||(p.house&&p.house.items.length)?`<div class="card"><h3>Casa: validación de todas las instalaciones</h3>${hs.length?hs.map(i=>`<div class="chk ${i.lv}"><b>${HCAT[i.cat].n}:</b> ${esc(i.msg)}</div>`).join(''):'<div class="chk ok">Sin fallos ni avisos.</div>'}</div>`:'';
-  return hcard+`<div class="card"><h1 style="margin:0">${esc(p.name)}</h1><p>Cliente: ${esc(p.client||'—')} · Fecha: ${new Date().toLocaleDateString('es-ES')}</p>
-  <div class="kpi"><div><b>${eur(t.total)}</b>Total con IVA</div><div><b>${p.boards.length}</b>cuadros</div><div><b>${t.mods}</b>módulos</div></div>
-  <div class="bar noprint" style="margin-top:8px"><button class="b" onclick="window.print()">Imprimir / guardar PDF</button></div></div>${boards}
+  const hasH=!!(p.house&&p.house.items.length),hasL=!!(p.logo&&(p.logo.blocks.length||Object.values(p.logo.qin).some(Boolean)));
+  const head=`<div class="card"><h1 style="margin:0">${esc(p.name)}</h1><p>Cliente: ${esc(p.client||'—')} · Fecha: ${new Date().toLocaleDateString('es-ES')}</p>
+  <div class="kpi"><div><b>${eur(t.total)}</b>Total con IVA</div><div><b>${p.boards.length}</b>cuadros</div><div><b>${t.mods}</b>módulos</div>${hasH?`<div><b>${p.house.items.length}</b>elementos en la casa</div>`:''}${hasL?`<div><b>${p.logo.blocks.length}</b>bloques del autómata</div>`:''}</div>
+  <div class="bar noprint" style="margin-top:8px"><button class="b" onclick="window.print()">Imprimir / guardar PDF</button></div></div>`;
+  let plan='',circ='',chk='';
+  if(hasH){const K=casaCalc(),C=K.C;plan=`<div class="card pb"><h3>Plano de la casa</h3>${casaReportSVG()}<p class="muted" style="font-size:12px">Cables eléctricos: un color por circuito. Datos en trazos azul claro, agua fría en azul, agua caliente en rojo y gas en naranja. Los números de las medidas están en metros.</p></div>`;
+    chk=checklistHTML(K.iss,p.house);
+    circ=`<div class="card"><h3>Circuitos eléctricos de la vivienda</h3><table><tr><th>Circuito</th><th>Uso</th><th class="r">Puntos</th><th class="r">kW</th><th class="r">In (A)</th><th class="r">Sección</th><th class="r">Longitud</th></tr>${Object.values(C.circ).map(c=>`<tr><td><b>${c.code}</b></td><td>${esc(c.def.n)}</td><td class="r">${c.pts}</td><td class="r">${f1(c.kw)}</td><td class="r">${c.def.In}</td><td class="r">${c.def.sec} mm²</td><td class="r">${c.lenM} m</td></tr>`).join('')}</table><p style="font-size:12.5px">${C.area.toFixed(0)} m² útiles · electrificación ${C.elev?'elevada':'básica'}${C.cold?` · tubería de agua ${Math.round(C.cold.total/100*1.1)} m`:''}${C.gas?` · gas ${C.gas.kw} kW`:''}</p></div>`}
+  let aut='';
+  if(hasL){const g=lgProg(),iss=lgIssues(g),chkL=lgCheck(),linked=Object.entries(g.link||{}).filter(([k,v])=>v),h=p.house||{items:[],rooms:[]};
+    const nameOfLink=v=>{if(v.startsWith('lights:')){const r=h.rooms.find(x=>'lights:'+x.id===v);return r?'Todas las luces de '+(r.name||RT[r.type]):'?'}const id=v.slice(v.indexOf(':')+1),it=h.items.find(x=>x.id===id);return it?(v.startsWith('bup:')?'Persiana · SUBIR':v.startsWith('bdn:')?'Persiana · BAJAR':HI[it.k].n)+' · '+((roomAt(h,it.x,it.y)||{name:'exterior'}).name):'(ya no existe)'};
+    aut=`<div class="card pb"><h3>Esquema del autómata programable</h3>${lgReportSVG()}</div>
+    <div class="card"><h3>Entradas y salidas</h3><table><tr><th>Terminal</th><th>Nombre</th><th>Vinculado a la casa</th></tr>${linked.map(([k,v])=>`<tr><td><b>${k}</b></td><td>${esc((g.ins[k]||g.q[k]||g.ai[k]||{}).n||'')}</td><td>${esc(nameOfLink(v))}</td></tr>`).join('')||'<tr><td colspan="3" class="muted">Sin vínculos con la casa.</td></tr>'}</table></div>
+    <div class="card"><h3>Validación del autómata</h3>${iss.filter(i=>i.lv!=='info').map(i=>`<div class="chk ${i.lv}">${esc(i.msg)}</div>`).join('')||'<div class="chk ok">Programa correcto.</div>'}<h3 style="margin-top:10px">Comprobación automática de todas las combinaciones</h3>${chkL.map(i=>`<div class="chk ${i.lv}">${esc(i.msg)}</div>`).join('')}</div>`}
+  return head+plan+chk+hcard+circ+`<div class="pb"></div>`+boards+aut+`
   <div class="card"><h3>Resumen económico</h3><table><tr><td>Material</td><td class="r">${eur(t.matNet)}</td></tr><tr><td>Pequeño material + montaje</td><td class="r">${eur(t.aux+t.labor)}</td></tr><tr><td>Margen</td><td class="r">${eur(t.mg)}</td></tr><tr class="tot"><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${p.vat}%</td><td class="r">${eur(t.vat)}</td></tr><tr class="tot"><td>TOTAL</td><td class="r">${eur(t.total)}</td></tr></table>
-  <p class="muted" style="font-size:12px">Cálculos orientativos. Verificar por técnico competente conforme al REBT/IEC 61439 antes de fabricar o instalar.</p></div>`;
+  <p class="muted" style="font-size:12px">Cálculos orientativos. Verificar por técnico competente conforme al REBT, CTE, reglamento de gas e IEC 61439 antes de fabricar o instalar.</p></div>`;
 }
 S=load();render();
 
