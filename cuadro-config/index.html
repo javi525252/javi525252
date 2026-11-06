@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CuadroConfig</title>
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0f2a3d"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">
 <style>
 :root{--bg:#f4f6f8;--card:#fff;--tx:#1d2733;--mu:#6b7785;--pr:#0b7a4b;--pr2:#e3f4ec;--bd:#d9dfe5;--er:#c62828;--wa:#e08a00;--ok:#2e7d32;--in:#1565c0}
 *{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--tx)}
@@ -51,7 +52,7 @@ svg text{font:11px system-ui}.muted{color:var(--mu)}
 <button class="b s" onclick="undo()" title="Ctrl+Z">↶ Deshacer</button><button class="b s" onclick="redo()" title="Ctrl+Y">↷ Rehacer</button>
 <button class="b s" onclick="newProject()">+ Proyecto</button>
 <button class="b s" onclick="delProject()">Eliminar</button>
-<button class="b s" onclick="exportJSON()">Exportar</button>
+<button class="b s" id="inst-btn" onclick="pwaInstall()">Instalar app</button><button class="b s" onclick="exportJSON()">Exportar</button>
 <button class="b s" onclick="document.getElementById('imp').click()">Importar</button>
 <input type="file" id="imp" accept=".json" hidden onchange="importJSON(this)">
 </header>
@@ -67,5 +68,7 @@ svg text{font:11px system-ui}.muted{color:var(--mu)}
 <script src="asistente.js"></script>
 <script src="share.js"></script>
 <script src="compra.js"></script>
+<script src="calculos.js"></script>
+<script src="documentos.js"></script>
 <script src="app.js"></script>
 </body></html>

@@ -247,13 +247,15 @@ function render(){
   $('#proj').innerHTML=S.projects.map((p,i)=>`<option value="${i}" ${i===S.cur?'selected':''}>${esc(p.name)}</option>`).join('');
   $('#proj').onchange=e=>{S.cur=+e.target.value;selId=null;render()};
   const tabs=[['asistente','Asistente'],['compra','Lista de compra'],['guardar','Guardar / compartir'],['casa','Casa (plano)'],['logo','Domótica (autómata)'],['design','Cuadro'],['diagram','Esquema unifilar'],['encl','Envolvente'],['m3d','Montaje 3D'],['budget','Presupuesto'],['catalog','Catálogo y envolventes'],['labels','Etiquetas'],['report','Informe'],['project','Proyecto']];
+  (window.XT||[]).forEach(x=>{const i=tabs.findIndex(t=>t[0]===(x.after||'design'));tabs.splice(i<0?tabs.length:i+1,0,[x.k,x.n])});
   $('#nav').innerHTML=tabs.map(([k,n])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
-  const f={compra:vCompra,guardar:vGuardar,asistente:vAsistente,logo:vLogo,casa:vCasa,design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,m3d:vM3D,project:vProject}[tab];
+  const f={compra:vCompra,guardar:vGuardar,asistente:vAsistente,logo:vLogo,casa:vCasa,design:vDesign,diagram:vDiagram,encl:vEncl,budget:vBudget,catalog:vCatalog,report:vReport,labels:vLabels,m3d:vM3D,project:vProject,...Object.fromEntries((window.XT||[]).map(x=>[x.k,x.v]))}[tab];
   $('#app').innerHTML=boardBar()+f();
   if(tab==='design')wireDnD();
   if(tab==='m3d')M3D.mount();
   if(tab==='casa')casaMount();
   if(tab==='logo')lgMount();
+  (window.XT||[]).forEach(x=>{if(x.k===tab&&x.mount)x.mount()});
 }
 window.go=t=>{tab=t;render()};
 function boardBar(){
@@ -440,7 +442,7 @@ function vReport(){
   const hs=p.house&&p.house.items.length?houseIssues(p.house):[];
   const hcard=hs.length||(p.house&&p.house.items.length)?`<div class="card"><h3>Casa: validación de todas las instalaciones</h3>${hs.length?hs.map(i=>`<div class="chk ${i.lv}"><b>${HCAT[i.cat].n}:</b> ${esc(i.msg)}</div>`).join(''):'<div class="chk ok">Sin fallos ni avisos.</div>'}</div>`:'';
   const hasH=!!(p.house&&p.house.items.length),hasL=!!(p.logo&&(p.logo.blocks.length||Object.values(p.logo.qin).some(Boolean)));
-  const head=`<div class="card"><h1 style="margin:0">${esc(p.name)}</h1><p>Cliente: ${esc(p.client||'—')} · Fecha: ${new Date().toLocaleDateString('es-ES')}</p>
+  const head=`<div class="card">${typeof companyHead==='function'?companyHead():''}<h1 style="margin:0">${esc(p.name)}</h1><p>Cliente: ${esc(p.client||'—')} · Fecha: ${new Date().toLocaleDateString('es-ES')}</p>
   <div class="kpi"><div><b>${eur(t.total)}</b>Total con IVA</div><div><b>${p.boards.length}</b>cuadros</div><div><b>${t.mods}</b>módulos</div>${hasH?`<div><b>${p.house.items.length}</b>elementos en la casa</div>`:''}${hasL?`<div><b>${p.logo.blocks.length}</b>bloques del autómata</div>`:''}</div>
   <div class="bar noprint" style="margin-top:8px"><button class="b" onclick="window.print()">Imprimir / guardar PDF</button></div></div>`;
   let plan='',circ='',chk='';
@@ -500,3 +502,8 @@ function vM3D(){
   <div id="m-banner" style="position:absolute;left:8px;right:8px;top:8px;pointer-events:none"></div><div id="m-hint" style="position:absolute;left:8px;bottom:6px;font-size:12px;color:#334;background:#fffc;padding:3px 7px;border-radius:5px"></div></div></div>
   <div id="m-right" style="max-height:72vh;overflow:auto"></div></div>`;
 }
+
+if('serviceWorker' in navigator&&!window.__ART&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+let _ip=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_ip=e;const b=document.getElementById('inst-btn');if(b)b.hidden=false});
+window.pwaInstall=()=>{if(_ip){_ip.prompt();_ip=null}else alert('En el móvil: menú del navegador → «Añadir a pantalla de inicio» / «Instalar app».')};
+if(window.__ART){const _b=document.getElementById('inst-btn');if(_b)_b.hidden=true}
