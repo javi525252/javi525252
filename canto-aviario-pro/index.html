@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canto y Aviario Pro</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2f6b3a">
+<style>
+:root{--bg:#f4f6f1;--card:#fff;--ink:#1f2a1f;--mut:#667366;--pri:#2f6b3a;--pri-ink:#fff;--bd:#d9dfd3;--warn:#b45309;--bad:#b91c1c;--ok:#15803d}
+:root[data-theme=dark]{--bg:#141813;--card:#1e251d;--ink:#e6ece3;--mut:#9aa89a;--pri:#4ea35c;--pri-ink:#08130a;--bd:#2f3a2e;--warn:#f59e0b;--bad:#f87171;--ok:#4ade80}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:72px}
+header{display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--pri);color:var(--pri-ink)}
+header h1{font-size:18px;margin:0;flex:1}
+header button{background:transparent;border:1px solid currentColor;color:inherit;border-radius:8px;padding:6px 10px}
+main{max-width:860px;margin:0 auto;padding:16px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd)}
+nav button{flex:1;border:0;background:none;color:var(--mut);padding:10px 2px;font-size:12px;min-height:56px}
+nav button span{display:block;font-size:20px}
+nav button.on{color:var(--pri);font-weight:700}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:14px}
+h2{margin:0 0 10px;font-size:18px} h3{margin:14px 0 6px;font-size:15px}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 2px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;min-height:44px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+button.b{background:var(--pri);color:var(--pri-ink);border:0;border-radius:8px;padding:10px 14px;min-height:44px;font:inherit;cursor:pointer;margin:6px 6px 0 0}
+button.b.s{background:transparent;color:var(--pri);border:1px solid var(--pri)}
+button.b.d{background:var(--bad);color:#fff}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--bd);margin-right:4px}
+.tag.ok{color:var(--ok);border-color:var(--ok)}.tag.warn{color:var(--warn);border-color:var(--warn)}.tag.bad{color:var(--bad);border-color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--bd);vertical-align:top}
+.mut{color:var(--mut);font-size:13px}.alert{border-left:4px solid var(--warn);padding:8px 12px;background:var(--bg);border-radius:6px;margin:8px 0}
+.alert.bad{border-color:var(--bad)}.alert.ok{border-color:var(--ok)}
+.item{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)}
+.big{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.sec{display:none}.sec.on{display:block}
+#doc{display:none}
+@media print{body>*:not(#doc){display:none!important}#doc{display:block!important;background:#fff;color:#000;padding:24px}}
+</style>
+</head>
+<body>
+<header><h1>🐦 Canto y Aviario Pro</h1><button id="theme" aria-label="Modo oscuro">🌓</button><button id="exp">Exportar</button><button id="imp">Importar</button><input type="file" id="impf" accept=".json" hidden></header>
+<main>
+<section id="aves" class="sec on"></section>
+<section id="escuela" class="sec"></section>
+<section id="cantos" class="sec"></section>
+<section id="aviario" class="sec"></section>
+<section id="cria" class="sec"></section>
+<section id="legal" class="sec"></section>
+</main>
+<nav id="nav"></nav>
+<div id="doc"></div>
+<script>
+'use strict';
+/* ---------- Datos de referencia ---------- */
+const ESP=[
+ {id:'jil-parva',n:'Jilguero Parva (ibérico)',c:'Carduelis carduelis parva',g:'fringilido',m:'copia',l:'aut',maestro:'jilguero'},
+ {id:'jil-major',n:'Jilguero Major',c:'Carduelis carduelis major',g:'fringilido',m:'copia',l:'aut',maestro:'jilguero'},
+ {id:'verderon',n:'Verderón',c:'Chloris chloris',g:'fringilido',m:'copia',l:'aut',maestro:'verderón'},
+ {id:'pardillo',n:'Pardillo',c:'Linaria cannabina',g:'fringilido',m:'copia',l:'aut',maestro:'pardillo'},
+ {id:'lugano',n:'Lúgano',c:'Spinus spinus',g:'fringilido',m:'copia',l:'aut',maestro:'lúgano'},
+ {id:'verdecillo',n:'Verdecillo',c:'Serinus serinus',g:'fringilido',m:'copia',l:'aut',maestro:'verdecillo'},
+ {id:'cardenalito',n:'Cardenalito de Venezuela',c:'Spinus cucullatus',g:'fringilido',m:'copia',l:'cites',maestro:'chamarín'},
+ {id:'cabecita',n:'Cabecita Negra',c:'Spinus magellanicus',g:'fringilido',m:'copia',l:'exo',maestro:'chamarín'},
+ {id:'timbrado',n:'Canario Timbrado Español',c:'Serinus canaria domestica',g:'canario',m:'copia',l:'dom',maestro:'canario'},
+ {id:'roller',n:'Canario Harzer Roller',c:'Serinus canaria domestica',g:'canario',m:'copia',l:'dom',maestro:'canario'},
+ {id:'malinois',n:'Canario Malinois (Waterslager)',c:'Serinus canaria domestica',g:'canario',m:'copia',l:'dom',maestro:'canario'},
+ {id:'americano',n:'Canario Cantor Americano',c:'Serinus canaria domestica',g:'canario',m:'copia',l:'dom',maestro:'canario'},
+ {id:'discontinuo',n:'Canario de Canto Discontinuo (Cantor Español)',c:'Serinus canaria domestica',g:'canario',m:'discontinuo',l:'dom',maestro:'—'}
+];
+const LEG={dom:['Doméstica','ok','Anilla cerrada/chip y libro de registro recomendados.'],
+ aut:['Autóctona (LESRPE)','warn','Requiere anilla cerrada oficial, origen legal acreditado y registro (núcleo zoológico/federado).'],
+ cites:['CITES Anexo A/B/C','bad','Requiere certificado CITES / documentación UE y marcaje. Verificar anexo exacto.'],
+ exo:['Exótica – verificar','warn','Comprobar si es invasora prohibida o regulada en tu comunidad.'],
+ inv:['Invasora prohibida','bad','Tenencia/venta prohibida salvo autorización.']};
+const EPOCAS=['Cría','Muda','Reposo','Concurso'];
+const DIETA={
+ 'Cría':['Mixtura base: alpiste, lino, negrillo/colza, mijo','Pasta de cría diaria + germinados','Frutas y verduras variadas','Silvestres: cardo, diente de león, achicoria, acedera','Proteína: insectos / pulgones (si procede)'],
+ 'Muda':['Mixtura base con más lino y negrillo','Semillas silvestres: cardo, girasol, achicoria','Pasta de muda / proteína moderada','Verdura fresca y fruta','Evitar estrés y cambios bruscos de jaula'],
+ 'Reposo':['Mixtura base ligera (alpiste + mijo)','Silvestres ocasionales','Reducir grasas y pasta','Control de peso'],
+ 'Concurso':['Mixtura habitual sin cambios','Sin novedades alimentarias 2 semanas antes','Agua fresca; transportín acostumbrado','Ajustar luz y descanso']};
+const SUPL=['Probiótico','Prebiótico','Simbiótico','Miel (agua)','Vinagre de manzana'];
+const EQUIP=['Jaulas de cría','Voladeras','Jaulas de reclamo/educación','Comederos','Bebederos (bola/automático)','Bañeras','Nidos y material','Palillos/perchas','Transportines','Iluminación programada'];
+const PLANILLA=['Pureza/limpieza de notas','Volumen','Variedad','Cadencia','Timbre','Continuidad','Posición/porte','Entusiasmo','Armonía de conjunto'];
+const MAESTRO_ALERTAS=['Dieta ligera esta semana','Retirar cañamón y cardón (excitantes)','Controlar nivel de celo del maestro','Limitar horas de luz','Aislar maestro de hembras'];
+const CLINICA=['Coccidiosis','Megabacterias','Enteritis bacteriana','Problemas de plumaje','Otra'];
+
+/* ---------- Estado ---------- */
+const KEY='aviarioPro.v1';
+const def={aves:[],notas:[],sesiones:[],ph:[],cria:[],clinica:[],equip:{},suppl:{},muda:[],libro:[],cesiones:[],pasos:{}};
+let S;try{S=Object.assign({},def,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){S=structuredClone(def)}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){alert('No se pudo guardar: almacenamiento lleno o bloqueado')}};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const today=()=>new Date().toISOString().slice(0,10);
+const addDays=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+const esp=id=>ESP.find(e=>e.id===id)||ESP[0];
+const ave=id=>S.aves.find(a=>a.id===id);
+const aveName=id=>{const a=ave(id);return a?`${a.nombre||'Sin nombre'} (${a.anilla||'s/anilla'})`:'—'};
+const aveOpts=(sel,filter)=>S.aves.filter(filter||(()=>true)).map(a=>`<option value="${a.id}" ${a.id===sel?'selected':''}>${esc(aveName(a.id))}</option>`).join('');
+const espOpts=sel=>ESP.map(e=>`<option value="${e.id}" ${e.id===sel?'selected':''}>${esc(e.n)}</option>`).join('');
+const log=(tipo,aveId,det)=>{S.libro.push({id:uid(),f:today(),tipo,ave:aveId,det:det||''})};
+const fmt=d=>d?new Date(d+'T12:00:00').toLocaleDateString('es-ES'):'—';
+
+/* ---------- Navegación ---------- */
+const TABS=[['aves','🐦','Aves'],['escuela','🎵','Escuela'],['cantos','🔊','Cantos'],['aviario','🌾','Aviario'],['cria','🥚','Cría'],['legal','📋','Legal']];
+$('#nav').innerHTML=TABS.map(t=>`<button data-t="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
+function go(t){document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('on',s.id===t));
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+ try{localStorage.setItem('aviarioPro.tab',t)}catch(e){} R[t]();window.scrollTo(0,0)}
+$('#nav').onclick=e=>{const b=e.target.closest('button');if(b)go(b.dataset.t)};
+$('#theme').onclick=()=>{const d=document.documentElement;const n=d.dataset.theme==='dark'?'light':'dark';d.dataset.theme=n;try{localStorage.setItem('aviarioPro.theme',n)}catch(e){}};
+$('#exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='aviario-'+today()+'.json';a.click()};
+$('#imp').onclick=()=>$('#impf').click();
+$('#impf').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(!Array.isArray(j.aves))throw 0;if(!confirm('Esto reemplaza tus datos actuales. ¿Continuar?'))return;S=Object.assign({},def,j);save();go('aves')}catch(x){alert('Archivo no válido')}};
+
+/* ---------- AVES ---------- */
+let editAve=null;
+function rAves(){
+ const q=(window._q||'').toLowerCase();
+ const list=S.aves.filter(a=>!q||(a.anilla+a.nombre).toLowerCase().includes(q));
+ const a=editAve?ave(editAve)||{}:{};
+ $('#aves').innerHTML=`
+ <div class="card"><h2>${editAve?'Editar ejemplar':'Nuevo ejemplar'}</h2>
+ <div class="row">
+  <div><label>Anilla cerrada / chip *</label><input id="a_an" value="${esc(a.anilla)}"></div>
+  <div><label>Nombre / apodo</label><input id="a_no" value="${esc(a.nombre)}"></div>
+  <div><label>Especie / raza</label><select id="a_es">${espOpts(a.esp)}</select></div>
+  <div><label>Sexo</label><select id="a_sx">${['Macho','Hembra','Sin sexar'].map(x=>`<option ${a.sexo===x?'selected':''}>${x}</option>`).join('')}</select></div>
+  <div><label>Nacimiento</label><input type="date" id="a_na" value="${a.nac||''}"></div>
+  <div><label>Origen</label><input id="a_or" value="${esc(a.origen)}" placeholder="Cría propia / criador / fecha"></div>
+  <div><label>Padre</label><select id="a_pa"><option value="">—</option>${aveOpts(a.padre,x=>x.sexo==='Macho'&&x.id!==a.id)}</select></div>
+  <div><label>Madre</label><select id="a_ma"><option value="">—</option>${aveOpts(a.madre,x=>x.sexo==='Hembra'&&x.id!==a.id)}</select></div>
+ </div>
+ <label>Mutación / híbrido / notas</label><textarea id="a_nt" rows="2">${esc(a.notas)}</textarea>
+ <button class="b" id="a_ok">${editAve?'Guardar cambios':'Añadir ave'}</button>${editAve?'<button class="b s" id="a_ca">Cancelar</button>':''}
+ </div>
+ <div class="card"><h2>Mi colección (${S.aves.length})</h2>
+ <input id="a_q" placeholder="🔍 Buscar por anilla o nombre (o escanea el QR de la jaula)" value="${esc(window._q||'')}">
+ ${list.map(x=>{const e=esp(x.esp),l=LEG[e.l];return `<div class="item"><div><b>${esc(x.nombre||'Sin nombre')}</b> · ${esc(x.anilla)}<br><span class="mut">${esc(e.n)} · ${x.sexo} · ${fmt(x.nac)}</span><br><span class="tag ${l[1]}">${l[0]}</span>${x.baja?'<span class="tag bad">Baja</span>':''}</div>
+  <div><button class="b s" data-ed="${x.id}">✏️</button><button class="b s" data-qr="${x.id}">QR</button><button class="b s" data-ba="${x.id}">Baja</button></div></div>`}).join('')||'<p class="mut">Aún no hay ejemplares.</p>'}
+ </div>`;
+ $('#a_q').oninput=e=>{window._q=e.target.value;const p=e.target.selectionStart;rAves();const i=$('#a_q');i.focus();i.setSelectionRange(p,p)};
+ if(editAve)$('#a_ca').onclick=()=>{editAve=null;rAves()};
+ $('#a_ok').onclick=()=>{
+  const v=id=>$(id).value.trim();
+  if(!v('#a_an')){alert('La anilla/chip es obligatoria');return}
+  if(S.aves.some(x=>x.anilla===v('#a_an')&&x.id!==editAve)){alert('Ya existe un ave con esa anilla');return}
+  const d={anilla:v('#a_an'),nombre:v('#a_no'),esp:$('#a_es').value,sexo:$('#a_sx').value,nac:$('#a_na').value,origen:v('#a_or'),padre:$('#a_pa').value,madre:$('#a_ma').value,notas:v('#a_nt')};
+  if(editAve){Object.assign(ave(editAve),d)}else{const n={id:uid(),...d};S.aves.push(n);log(d.origen&&!/propia/i.test(d.origen)?'Entrada':'Nacimiento/alta',n.id,d.origen)}
+  editAve=null;save();rAves()};
+ $('#aves').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.ed){editAve=b.dataset.ed;rAves();window.scrollTo(0,0)}
+  if(b.dataset.ba){const m=prompt('Motivo de la baja (muerte, cesión, venta…)');if(m){ave(b.dataset.ba).baja={f:today(),m};log('Baja',b.dataset.ba,m);save();rAves()}}
+  if(b.dataset.qr){const a=ave(b.dataset.qr);alert('Código para la jaula (genera un QR con este texto):\n\nAVIARIO:'+a.anilla)}};
+}
+
+/* ---------- ESCUELA ---------- */
+let audio=new Audio(),pistas=[],tmr=null,tLeft=0,rec=null,recChunks=[],recUrl=null;
+audio.loop=true;
+function rEscuela(){
+ const hoy=S.sesiones.slice().sort((a,b)=>a.h.localeCompare(b.h));
+ $('#escuela').innerHTML=`
+ <div class="card"><h2>Reproductor de maestros</h2>
+ <label>Ave a educar</label><select id="e_av"><option value="">— sin ficha —</option>${aveOpts('',x=>!x.baja)}</select>
+ <div id="e_mod"></div>
+ <label>Cargar pistas de audio (archivos de tu dispositivo)</label><input type="file" id="e_f" accept="audio/*" multiple>
+ <label>Pista</label><select id="e_p">${pistas.map((p,i)=>`<option value="${i}">${esc(p.name)}</option>`).join('')||'<option>Sin pistas</option>'}</select>
+ <div class="row"><div><label>Volumen (máx. 60% para evitar estrés)</label><input type="range" id="e_v" min="0" max="60" value="30"></div>
+ <div><label>Duración sesión (min)</label><input type="number" id="e_d" value="20" min="1" max="60"></div></div>
+ <div class="big" id="e_t">00:00</div>
+ <button class="b" id="e_go">▶ Iniciar sesión</button><button class="b s" id="e_st">■ Parar</button>
+ <p class="mut">Se reproduce en bucle y se detiene sola al acabar el temporizador. Funciona sin conexión.</p></div>
+
+ <div class="card"><h2>Programar sesiones</h2>
+ <div class="row"><div><label>Hora</label><input type="time" id="s_h" value="08:00"></div><div><label>Minutos</label><input type="number" id="s_d" value="20"></div><div><label>Ave / grupo</label><select id="s_a"><option value="">Todos los noveles</option>${aveOpts()}</select></div></div>
+ <button class="b" id="s_ok">Añadir sesión</button>
+ ${hoy.map(s=>`<div class="item"><span>${s.h} · ${s.d} min · ${s.a?esc(aveName(s.a)):'Todos'}</span><button class="b s" data-ds="${s.id}">✕</button></div>`).join('')}
+ <p class="mut" id="s_nx"></p></div>
+
+ <div class="card"><h2>Guía por fase</h2><div id="e_guia"></div></div>
+
+ <div class="card"><h2>Maestro vivo</h2>
+ ${MAESTRO_ALERTAS.map((t,i)=>`<label class="item"><span>${t}</span><input type="checkbox" style="width:auto;min-height:0" data-ma="${i}" ${S.pasos['ma'+i]===today()?'checked':''}></label>`).join('')}
+ <p class="mut">Las casillas se reinician cada día.</p></div>
+
+ <div class="card"><h2>Evaluación y descarte</h2>
+ <button class="b" id="r_go">🎙 Grabar</button><button class="b s" id="r_st">■ Detener</button><audio id="r_au" controls style="width:100%;margin-top:8px;display:none"></audio>
+ <p class="mut">La grabación se conserva mientras la app esté abierta; descárgala para guardarla.</p>
+ <div class="row"><div><label>Ave</label><select id="n_a">${aveOpts()}</select></div><div><label>Tipo</label><select id="n_t"><option value="+">Nota positiva</option><option value="-">Nota negativa/discordante</option></select></div></div>
+ <label>Descripción</label><input id="n_d" placeholder="Ej.: nota hueca en la tercera estrofa">
+ <button class="b" id="n_ok">Registrar nota</button>
+ ${S.notas.slice().reverse().slice(0,15).map(n=>`<div class="item"><span><span class="tag ${n.t==='+'?'ok':'bad'}">${n.t==='+'?'Positiva':'Negativa'}</span> ${esc(aveName(n.a))} — ${esc(n.d)} <span class="mut">${fmt(n.f)}</span></span></div>`).join('')}
+ <div id="n_alert"></div></div>
+
+ <div class="card"><h2>Simulador de planilla (hasta 90 puntos)</h2>
+ ${PLANILLA.map((p,i)=>`<div class="item"><span>${p}</span><input type="number" min="0" max="10" value="0" style="width:80px" class="pl"></div>`).join('')}
+ <div class="big" id="pl_t">0 / 90</div><p class="mut">Planilla orientativa de 9 conceptos × 10 puntos; adáptala al reglamento de tu federación.</p></div>`;
+
+ const upd=()=>{const a=ave($('#e_av').value),e=esp(a?a.esp:'timbrado'),disc=e.m==='discontinuo';
+  $('#e_mod').innerHTML=disc?'<div class="alert bad"><b>Modo canto discontinuo:</b> audio bloqueado. Aísla a los noveles de adultos y métodos artificiales para preservar el innatismo y los giros compuestos.</div>':`<div class="alert ok">Educación por copia · maestro recomendado: <b>${esc(e.maestro)}</b></div>`;
+  ['e_go','e_f','e_p'].forEach(i=>$('#'+i).disabled=disc);
+  $('#e_guia').innerHTML=disc?'<ul><li>Separar noveles de cualquier adulto cantor.</li><li>Sin pistas, sin CD ni reclamos.</li><li>Observa y anota giros compuestos propios.</li></ul>':
+  '<ol><li><b>Tras el nido:</b> separar en jaulas pequeñas de educación; maestro a la vista/oído.</li><li><b>Sesiones cortas</b> 2–3 al día con pista limpia de código de canto.</li><li><b>Muda otoñal:</b> seguimiento intensivo; el aprendizaje se afianza.</li><li><b>Descarte:</b> aparta a tiempo a quien muestre notas discordantes.</li></ol>'};
+ $('#e_av').onchange=upd;upd();
+ $('#e_f').onchange=e=>{pistas=[...e.target.files].map(f=>({name:f.name,url:URL.createObjectURL(f)}));rEscuela()};
+ $('#e_v').oninput=e=>audio.volume=e.target.value/100;audio.volume=.3;
+ const stop=()=>{audio.pause();clearInterval(tmr);tmr=null;$('#e_t').textContent='00:00'};
+ $('#e_go').onclick=()=>{const p=pistas[$('#e_p').value];if(!p){alert('Carga una pista primero');return}stop();audio.src=p.url;audio.play().catch(()=>alert('No se pudo reproducir'));tLeft=Math.max(1,Math.min(60,+$('#e_d').value||20))*60;
+  tmr=setInterval(()=>{tLeft--;$('#e_t').textContent=String(Math.floor(tLeft/60)).padStart(2,'0')+':'+String(tLeft%60).padStart(2,'0');if(tLeft<=0)stop()},1000)};
+ $('#e_st').onclick=stop;
+ $('#s_ok').onclick=()=>{S.sesiones.push({id:uid(),h:$('#s_h').value,d:+$('#s_d').value||20,a:$('#s_a').value});save();rEscuela()};
+ const nx=hoy.find(s=>s.h>new Date().toTimeString().slice(0,5))||hoy[0];$('#s_nx').textContent=nx?'Próxima sesión: '+nx.h:'';
+ $('#escuela').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.ds){S.sesiones=S.sesiones.filter(s=>s.id!==b.dataset.ds);save();rEscuela()}};
+ $('#escuela').onchange=e=>{if(e.target.dataset.ma!==undefined){S.pasos['ma'+e.target.dataset.ma]=e.target.checked?today():'';save()}};
+ $('#n_ok').onclick=()=>{if(!$('#n_a').value||!$('#n_d').value.trim()){alert('Elige ave y describe la nota');return}S.notas.push({a:$('#n_a').value,t:$('#n_t').value,d:$('#n_d').value.trim(),f:today()});save();rEscuela()};
+ const neg={};S.notas.forEach(n=>{if(n.t==='-')neg[n.a]=(neg[n.a]||0)+1});
+ $('#n_alert').innerHTML=Object.entries(neg).filter(([,c])=>c>=3).map(([a,c])=>`<div class="alert bad">⚠ ${esc(aveName(a))} acumula ${c} notas negativas: valora apartarlo del grupo.</div>`).join('');
+ document.querySelectorAll('.pl').forEach(i=>i.oninput=()=>{i.value=Math.max(0,Math.min(10,+i.value||0));$('#pl_t').textContent=[...document.querySelectorAll('.pl')].reduce((s,x)=>s+(+x.value),0)+' / 90'});
+ $('#r_go').onclick=async()=>{try{const st=await navigator.mediaDevices.getUserMedia({audio:true});recChunks=[];rec=new MediaRecorder(st);rec.ondataavailable=e=>recChunks.push(e.data);
+  rec.onstop=()=>{st.getTracks().forEach(t=>t.stop());if(recUrl)URL.revokeObjectURL(recUrl);recUrl=URL.createObjectURL(new Blob(recChunks,{type:rec.mimeType}));const au=$('#r_au');au.src=recUrl;au.style.display='block'};rec.start();$('#r_go').textContent='● Grabando…'}catch(x){alert('No hay acceso al micrófono')}};
+ $('#r_st').onclick=()=>{if(rec&&rec.state==='recording'){rec.stop();$('#r_go').textContent='🎙 Grabar'}};
+}
+
+/* ---------- AVIARIO ---------- */
+function rAviario(){
+ const ep=window._ep||'Cría',ph=S.ph.slice().reverse();
+ const last=ph[0];
+ $('#aviario').innerHTML=`
+ <div class="card"><h2>Plan de dieta</h2>
+ <select id="v_ep">${EPOCAS.map(e=>`<option ${e===ep?'selected':''}>${e}</option>`).join('')}</select>
+ <ul>${DIETA[ep].map(x=>`<li>${x}</li>`).join('')}</ul>
+ <h3>Suplementación (hoy)</h3>
+ ${SUPL.map(s=>`<label class="item"><span>${s}</span><input type="checkbox" style="width:auto;min-height:0" data-su="${s}" ${S.suppl[s]===today()?'checked':''}></label>`).join('')}</div>
+
+ <div class="card"><h2>pH del agua</h2>
+ <div class="row"><div><label>Lectura</label><input type="number" step="0.1" id="p_v" min="0" max="14"></div><div><label>Rango objetivo</label><input id="p_r" value="${S.phRango||'6.0-7.5'}"></div></div>
+ <button class="b" id="p_ok">Registrar</button>
+ ${last?(()=>{const [lo,hi]=(S.phRango||'6.0-7.5').split('-').map(Number);const bad=last.v<lo||last.v>hi;return `<div class="alert ${bad?'bad':'ok'}">Última: <b>${last.v}</b> (${fmt(last.f)}) ${bad?'— fuera de rango':'— correcto'}</div>`})():''}
+ <table>${ph.slice(0,8).map(p=>`<tr><td>${fmt(p.f)}</td><td>${p.v}</td></tr>`).join('')}</table></div>
+
+ <div class="card"><h2>Equipamiento (checklist)</h2>
+ ${EQUIP.map(x=>`<div class="item"><span>${x}</span><input type="number" min="0" style="width:80px" data-eq="${x}" value="${S.equip[x]||0}"></div>`).join('')}</div>
+
+ <div class="card"><h2>Muda</h2>
+ <div class="alert">Evita cambios bruscos, sobrepoblación y manipulaciones. Aporta proteína moderada y baños.</div>
+ <div class="row"><div><label>Ave</label><select id="m_a">${aveOpts()}</select></div><div><label>Inicio</label><input type="date" id="m_i" value="${today()}"></div><div><label>Estado</label><select id="m_e"><option>Iniciando</option><option>En curso</option><option>Terminada</option></select></div></div>
+ <button class="b" id="m_ok">Registrar</button>
+ ${S.muda.slice().reverse().map(m=>`<div class="item"><span>${esc(aveName(m.a))} · ${fmt(m.i)} · ${m.e}</span></div>`).join('')}</div>
+
+ <div class="card"><h2>Diario clínico</h2>
+ <div class="alert">Tiempo húmedo: valora tratamiento preventivo y revisa deposiciones.</div>
+ <div class="row"><div><label>Ave</label><select id="c_a">${aveOpts()}</select></div><div><label>Afección</label><select id="c_t">${CLINICA.map(c=>`<option>${c}</option>`).join('')}</select></div></div>
+ <label>Observaciones (vientre, coprológico, tratamiento)</label><textarea id="c_d" rows="2"></textarea>
+ <button class="b" id="c_ok">Añadir entrada</button>
+ ${S.clinica.slice().reverse().map(c=>`<div class="item"><span><b>${esc(c.t)}</b> · ${esc(aveName(c.a))} · ${fmt(c.f)}<br><span class="mut">${esc(c.d)}</span></span></div>`).join('')}</div>`;
+ $('#v_ep').onchange=e=>{window._ep=e.target.value;rAviario()};
+ $('#aviario').onchange=e=>{const t=e.target;
+  if(t.dataset.su){S.suppl[t.dataset.su]=t.checked?today():'';save()}
+  if(t.dataset.eq){S.equip[t.dataset.eq]=+t.value||0;save()}};
+ $('#p_ok').onclick=()=>{const v=parseFloat($('#p_v').value);if(isNaN(v))return;S.phRango=$('#p_r').value;S.ph.push({f:today(),v});save();rAviario()};
+ $('#m_ok').onclick=()=>{if(!$('#m_a').value)return;S.muda.push({a:$('#m_a').value,i:$('#m_i').value,e:$('#m_e').value});save();rAviario()};
+ $('#c_ok').onclick=()=>{if(!$('#c_a').value)return;S.clinica.push({a:$('#c_a').value,t:$('#c_t').value,d:$('#c_d').value.trim(),f:today()});save();rAviario()};
+}
+
+/* ---------- CRÍA ---------- */
+function ancestros(id,n=2,set=new Set()){const a=ave(id);if(!a||n<0)return set;[a.padre,a.madre].filter(Boolean).forEach(p=>{set.add(p);ancestros(p,n-1,set)});return set}
+function rCria(){
+ const hoy=today();
+ $('#cria').innerHTML=`
+ <div class="card"><h2>Nueva pareja / puesta</h2>
+ <div class="row"><div><label>Macho</label><select id="k_m">${aveOpts('',x=>x.sexo==='Macho'&&!x.baja)}</select></div><div><label>Hembra</label><select id="k_h">${aveOpts('',x=>x.sexo==='Hembra'&&!x.baja)}</select></div>
+ <div><label>Fecha de puesta (1er huevo)</label><input type="date" id="k_f" value="${hoy}"></div><div><label>Huevos</label><input type="number" id="k_n" value="4" min="1"></div></div>
+ <div id="k_co"></div>
+ <button class="b" id="k_ok">Registrar puesta</button></div>
+ <div class="card"><h2>Tarjetas de cría</h2>
+ ${S.cria.slice().reverse().map(c=>{const inc=addDays(c.f,12),nac=addDays(c.f,13),ind=addDays(nac,15);
+  const est=hoy<inc?'Incubando':hoy<=nac?'Nacimiento inminente':hoy<ind?'Pollos en nido':'Independizados';
+  return `<div class="item"><div><b>${esc(aveName(c.m))} × ${esc(aveName(c.h))}</b><br><span class="mut">Puesta ${fmt(c.f)} · ${c.n} huevos</span><br>
+  Eclosión: ${fmt(inc)}–${fmt(nac)} · Independencia: ~${fmt(ind)}<br><span class="tag ${est==='Incubando'?'warn':'ok'}">${est}</span>${c.cons?'<span class="tag bad">Consanguinidad</span>':''}</div>
+  <div><button class="b s" data-nc="${c.id}">+ Pollo</button></div></div>`}).join('')||'<p class="mut">Sin puestas registradas.</p>'}</div>`;
+ const chk=()=>{const m=$('#k_m').value,h=$('#k_h').value;if(!m||!h){$('#k_co').innerHTML='';return}
+  const a=ancestros(m),b=ancestros(h);a.add(m);b.add(h);const comun=[...a].filter(x=>b.has(x)&&x!==m&&x!==h);
+  const dir=(ave(m).padre&&ave(m).padre===ave(h).padre)||(ave(m).madre&&ave(m).madre===ave(h).madre)||ave(h).padre===m||ave(h).madre===m||ave(m).padre===h||ave(m).madre===h;
+  $('#k_co').innerHTML=comun.length||dir?`<div class="alert bad">⚠ Parentesco detectado: ${comun.map(aveName).join(', ')||'directo'}. Riesgo de consanguinidad.</div>`:'<div class="alert ok">Sin parentesco conocido (2 generaciones).</div>';return comun.length||dir};
+ ['k_m','k_h'].forEach(i=>$('#'+i).onchange=chk);chk();
+ $('#k_ok').onclick=()=>{if(!$('#k_m').value||!$('#k_h').value){alert('Necesitas un macho y una hembra registrados');return}
+  S.cria.push({id:uid(),m:$('#k_m').value,h:$('#k_h').value,f:$('#k_f').value,n:+$('#k_n').value||1,cons:!!chk()});log('Puesta',$('#k_h').value,$('#k_n').value+' huevos');save();rCria()};
+ $('#cria').onclick=e=>{const b=e.target.closest('button');if(!b||!b.dataset.nc)return;const c=S.cria.find(x=>x.id===b.dataset.nc);const an=prompt('Anilla del pollo');if(!an)return;
+  if(S.aves.some(x=>x.anilla===an)){alert('Anilla duplicada');return}
+  const m=ave(c.m);S.aves.push({id:uid(),anilla:an,nombre:'',esp:m.esp,sexo:'Sin sexar',nac:addDays(c.f,13),origen:'Cría propia',padre:c.m,madre:c.h,notas:''});log('Nacimiento',S.aves[S.aves.length-1].id,'Cría propia');save();rCria()};
+}
+
+/* ---------- LEGAL ---------- */
+function rLegal(){
+ const res={};S.aves.filter(a=>!a.baja).forEach(a=>{const k=esp(a.esp).l;res[k]=(res[k]||0)+1});
+ $('#legal').innerHTML=`
+ <div class="card"><h2>Estatus legal de tu aviario</h2>
+ ${Object.keys(res).map(k=>`<div class="alert ${LEG[k][1]==='ok'?'ok':LEG[k][1]==='bad'?'bad':''}"><b>${LEG[k][0]}</b> × ${res[k]}<br><span class="mut">${LEG[k][2]}</span></div>`).join('')||'<p class="mut">Añade aves para ver su clasificación.</p>'}
+ <p class="mut">⚠ Clasificación orientativa. La normativa (LESRPE, CITES, comunidades autónomas) cambia: verifica con tu federación y administración.</p></div>
+ <div class="card"><h2>Libro de registro</h2>
+ <table><tr><th>Fecha</th><th>Tipo</th><th>Ave</th><th>Detalle</th></tr>${S.libro.slice().reverse().map(l=>`<tr><td>${fmt(l.f)}</td><td>${esc(l.tipo)}</td><td>${esc(aveName(l.ave))}</td><td>${esc(l.det)}</td></tr>`).join('')}</table>
+ <button class="b s" id="l_csv">Descargar CSV</button></div>
+ <div class="card"><h2>Documento de cesión / factura</h2>
+ <label>Ave</label><select id="d_a">${aveOpts('',x=>!x.baja)}</select>
+ <div class="row"><div><label>Cedente (nombre)</label><input id="d_cn"></div><div><label>DNI/NIF cedente</label><input id="d_cd"></div>
+ <div><label>Cesionario (nombre)</label><input id="d_rn"></div><div><label>DNI/NIF cesionario</label><input id="d_rd"></div>
+ <div><label>Fecha</label><input type="date" id="d_f" value="${today()}"></div><div><label>Precio (€, opcional)</label><input id="d_p"></div></div>
+ <button class="b" id="d_ok">Generar / Imprimir PDF</button></div>`;
+ $('#l_csv').onclick=()=>{const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';const rows=[['Fecha','Tipo','Anilla','Detalle'],...S.libro.map(l=>[l.f,l.tipo,ave(l.ave)?.anilla||'',l.det])];
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+rows.map(r=>r.map(q).join(',')).join('\n')],{type:'text/csv'}));a.download='libro-registro.csv';a.click()};
+ $('#d_ok').onclick=()=>{const a=ave($('#d_a').value);if(!a){alert('Elige un ave');return}
+  const v=i=>$(i).value.trim();if(!v('#d_cn')||!v('#d_cd')||!v('#d_rn')||!v('#d_rd')){alert('Completa nombre y DNI/NIF de ambas partes');return}
+  const e=esp(a.esp);
+  $('#doc').innerHTML=`<h1>Documento de cesión de ave</h1><p>Fecha: ${fmt($('#d_f').value)}</p>
+  <p><b>Cedente:</b> ${esc(v('#d_cn'))} — DNI/NIF ${esc(v('#d_cd'))}</p><p><b>Cesionario:</b> ${esc(v('#d_rn'))} — DNI/NIF ${esc(v('#d_rd'))}</p>
+  <table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><tr><td>Especie</td><td>${esc(e.n)}</td></tr><tr><td>Nombre científico</td><td><i>${esc(e.c)}</i></td></tr><tr><td>Anilla cerrada / chip</td><td>${esc(a.anilla)}</td></tr><tr><td>Fecha de nacimiento</td><td>${fmt(a.nac)}</td></tr><tr><td>Sexo</td><td>${a.sexo}</td></tr><tr><td>Origen</td><td>${esc(a.origen)}</td></tr><tr><td>Padre</td><td>${esc(aveName(a.padre))}</td></tr><tr><td>Madre</td><td>${esc(aveName(a.madre))}</td></tr>${v('#d_p')?`<tr><td>Precio</td><td>${esc(v('#d_p'))} €</td></tr>`:''}</table>
+  <p>Estatus legal: ${LEG[e.l][0]}.</p><br><br><table style="width:100%"><tr><td>Firma cedente</td><td>Firma cesionario</td></tr></table>`;
+  a.baja={f:$('#d_f').value,m:'Cesión a '+v('#d_rn')};log('Salida (cesión)',a.id,v('#d_rn'));S.cesiones.push({a:a.id,f:$('#d_f').value});save();window.print();rLegal()};
+}
+
+/* ---------- CANTOS (biblioteca de grabaciones) ---------- */
+const TIPOS={
+ jilguero:['Canto completo (estrofa larga)','Canto de cortejo','Reclamo / llamada de contacto','Llamada de alarma'],
+ fringilido:['Canto completo','Reclamo / llamada de contacto','Llamada de alarma'],
+ timbrado:['Campanilla','Cascabel','Ligados / timbres','Agua (pico cerrado)','Canto completo'],
+ roller:['Hohlrolle (rodado hueco)','Klingelrolle (rodado timbrado)','Hohlklingel','Wasserrolle (agua)','Schockel','Glucke','Pfeifen (silbidos)','Canto completo'],
+ malinois:['Rodado de agua','Bajo (Bass)','Glucke','Flauta','Canto completo'],
+ americano:['Pasajes de agua','Flautas suaves','Canto completo'],
+ discontinuo:['Giros compuestos','Canto completo']};
+const tiposDe=e=>e.id.startsWith('jil')?TIPOS.jilguero:TIPOS[e.id]||TIPOS.fringilido;
+const XC={'jil-parva':'carduelis+carduelis','jil-major':'carduelis+carduelis','verderon':'chloris+chloris','pardillo':'linaria+cannabina','lugano':'spinus+spinus','verdecillo':'serinus+serinus','cardenalito':'spinus+cucullatus','cabecita':'spinus+magellanicus'};
+const idbOpen=()=>new Promise((res,rej)=>{try{const r=indexedDB.open('aviarioClips',1);r.onupgradeneeded=()=>r.result.createObjectStore('c');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}});
+async function clipsAll(){const db=await idbOpen();return new Promise((res,rej)=>{const out={};const q=db.transaction('c').objectStore('c').openCursor();q.onsuccess=()=>{const c=q.result;if(c){out[c.key]=c.value;c.continue()}else res(out)};q.onerror=()=>rej(q.error)})}
+async function clipPut(k,v){const db=await idbOpen();return new Promise((res,rej)=>{const t=db.transaction('c','readwrite');t.objectStore('c').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+async function clipDel(k){const db=await idbOpen();return new Promise((res,rej)=>{const t=db.transaction('c','readwrite');t.objectStore('c').delete(k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+const cAu=new Audio();let cPlay=null,cUrl=null;
+async function rCantos(){
+ const id=window._ce||'jil-parva',e=esp(id);let clips={},ok=true;
+ try{clips=await clipsAll()}catch(x){ok=false}
+ const xc=XC[id];
+ $('#cantos').innerHTML=`
+ <div class="card"><h2>Biblioteca de cantos</h2>
+ <label for="c_es">Clase de ave</label><select id="c_es">${espOpts(id)}</select>
+ ${ok?'':'<div class="alert bad">Este navegador no permite guardar audios; podrás escucharlos solo en esta sesión.</div>'}
+ ${e.m==='discontinuo'?'<div class="alert bad">Canto discontinuo: escuchar como referencia está bien, pero no uses estas pistas para educar noveles.</div>':''}
+ <p class="mut">Pasajes de canto típicos de la clase (orientativo; ajusta los nombres a tu estándar). Añade una grabación a cada uno y quedará guardada en este dispositivo, también sin conexión.</p>
+ ${xc?`<p><a href="https://xeno-canto.org/explore?query=${xc}" target="_blank" rel="noopener">Buscar grabaciones de ${esc(e.c)} en xeno-canto ↗</a> <span class="mut">(mayoría CC BY-NC-SA: cita al autor y no las uses comercialmente)</span></p>`:''}
+ ${tiposDe(e).map((t,i)=>{const k=id+'|'+t,c=clips[k];return `<div class="item" style="flex-wrap:wrap"><div style="flex:1;min-width:180px"><b>${esc(t)}</b><br><span class="mut">${c?esc(c.name)+(c.autor?' · '+esc(c.autor):''):'Sin grabación'}</span></div>
+  <div>${c?`<button class="b" data-pl="${i}">${cPlay===k?'■ Parar':'▶ Play'}</button><button class="b s" data-rm="${i}">✕</button>`:''}
+  <label class="b s" style="display:inline-block;color:var(--pri);margin:6px 6px 0 0;padding:10px 14px;border:1px solid var(--pri);border-radius:8px;min-height:44px">${c?'Cambiar':'＋ Añadir audio'}<input type="file" accept="audio/*" data-up="${i}" hidden></label></div>
+  ${c?'':''}</div>`}).join('')}
+ <label for="c_au">Autor / fuente de la grabación (se aplica a la próxima que añadas)</label><input id="c_au" placeholder="Ej.: Timo Schnabel, XC366733, CC BY-NC-SA" value="${esc(window._cau||'')}"></div>`;
+ $('#c_es').onchange=ev=>{window._ce=ev.target.value;cAu.pause();cPlay=null;rCantos()};
+ $('#c_au').oninput=ev=>window._cau=ev.target.value;
+ const tp=tiposDe(e);
+ $('#cantos').onclick=async ev=>{const b=ev.target.closest('button');if(!b)return;
+  if(b.dataset.rm!==undefined){const k=id+'|'+tp[b.dataset.rm];if(cPlay===k){cAu.pause();cPlay=null}try{await clipDel(k)}catch(x){}rCantos()}
+  if(b.dataset.pl!==undefined){const k=id+'|'+tp[b.dataset.pl];if(cPlay===k){cAu.pause();cPlay=null;rCantos();return}
+   const c=clips[k];if(cUrl)URL.revokeObjectURL(cUrl);cUrl=URL.createObjectURL(c.blob);cAu.src=cUrl;cAu.loop=false;cAu.onended=()=>{cPlay=null;rCantos()};
+   try{await cAu.play();cPlay=k}catch(x){alert('No se pudo reproducir este archivo')}rCantos()}};
+ $('#cantos').onchange=async ev=>{const f=ev.target.files&&ev.target.files[0];if(!f||ev.target.dataset.up===undefined)return;
+  const k=id+'|'+tp[ev.target.dataset.up];
+  try{await clipPut(k,{blob:f,name:f.name,autor:window._cau||''})}catch(x){alert('No se pudo guardar el audio en este navegador');return}
+  rCantos()};
+}
+
+const R={aves:rAves,escuela:rEscuela,cantos:rCantos,aviario:rAviario,cria:rCria,legal:rLegal};
+try{const t=localStorage.getItem('aviarioPro.theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark'}catch(e){}
+let t0='aves';try{t0=localStorage.getItem('aviarioPro.tab')||'aves'}catch(e){}
+go(R[t0]?t0:'aves');
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
