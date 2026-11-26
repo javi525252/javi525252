@@ -44,6 +44,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;p
 <main>
 <section id="aves" class="sec on"></section>
 <section id="escuela" class="sec"></section>
+<section id="cantos" class="sec"></section>
 <section id="aviario" class="sec"></section>
 <section id="cria" class="sec"></section>
 <section id="legal" class="sec"></section>
@@ -104,7 +105,7 @@ const log=(tipo,aveId,det)=>{S.libro.push({id:uid(),f:today(),tipo,ave:aveId,det
 const fmt=d=>d?new Date(d+'T12:00:00').toLocaleDateString('es-ES'):'—';
 
 /* ---------- Navegación ---------- */
-const TABS=[['aves','🐦','Aves'],['escuela','🎵','Escuela'],['aviario','🌾','Aviario'],['cria','🥚','Cría'],['legal','📋','Legal']];
+const TABS=[['aves','🐦','Aves'],['escuela','🎵','Escuela'],['cantos','🔊','Cantos'],['aviario','🌾','Aviario'],['cria','🥚','Cría'],['legal','📋','Legal']];
 $('#nav').innerHTML=TABS.map(t=>`<button data-t="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
 function go(t){document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('on',s.id===t));
  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
@@ -320,7 +321,53 @@ function rLegal(){
   a.baja={f:$('#d_f').value,m:'Cesión a '+v('#d_rn')};log('Salida (cesión)',a.id,v('#d_rn'));S.cesiones.push({a:a.id,f:$('#d_f').value});save();window.print();rLegal()};
 }
 
-const R={aves:rAves,escuela:rEscuela,aviario:rAviario,cria:rCria,legal:rLegal};
+/* ---------- CANTOS (biblioteca de grabaciones) ---------- */
+const TIPOS={
+ jilguero:['Canto completo (estrofa larga)','Canto de cortejo','Reclamo / llamada de contacto','Llamada de alarma'],
+ fringilido:['Canto completo','Reclamo / llamada de contacto','Llamada de alarma'],
+ timbrado:['Campanilla','Cascabel','Ligados / timbres','Agua (pico cerrado)','Canto completo'],
+ roller:['Hohlrolle (rodado hueco)','Klingelrolle (rodado timbrado)','Hohlklingel','Wasserrolle (agua)','Schockel','Glucke','Pfeifen (silbidos)','Canto completo'],
+ malinois:['Rodado de agua','Bajo (Bass)','Glucke','Flauta','Canto completo'],
+ americano:['Pasajes de agua','Flautas suaves','Canto completo'],
+ discontinuo:['Giros compuestos','Canto completo']};
+const tiposDe=e=>e.id.startsWith('jil')?TIPOS.jilguero:TIPOS[e.id]||TIPOS.fringilido;
+const XC={'jil-parva':'carduelis+carduelis','jil-major':'carduelis+carduelis','verderon':'chloris+chloris','pardillo':'linaria+cannabina','lugano':'spinus+spinus','verdecillo':'serinus+serinus','cardenalito':'spinus+cucullatus','cabecita':'spinus+magellanicus'};
+const idbOpen=()=>new Promise((res,rej)=>{try{const r=indexedDB.open('aviarioClips',1);r.onupgradeneeded=()=>r.result.createObjectStore('c');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}});
+async function clipsAll(){const db=await idbOpen();return new Promise((res,rej)=>{const out={};const q=db.transaction('c').objectStore('c').openCursor();q.onsuccess=()=>{const c=q.result;if(c){out[c.key]=c.value;c.continue()}else res(out)};q.onerror=()=>rej(q.error)})}
+async function clipPut(k,v){const db=await idbOpen();return new Promise((res,rej)=>{const t=db.transaction('c','readwrite');t.objectStore('c').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+async function clipDel(k){const db=await idbOpen();return new Promise((res,rej)=>{const t=db.transaction('c','readwrite');t.objectStore('c').delete(k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+const cAu=new Audio();let cPlay=null,cUrl=null;
+async function rCantos(){
+ const id=window._ce||'jil-parva',e=esp(id);let clips={},ok=true;
+ try{clips=await clipsAll()}catch(x){ok=false}
+ const xc=XC[id];
+ $('#cantos').innerHTML=`
+ <div class="card"><h2>Biblioteca de cantos</h2>
+ <label for="c_es">Clase de ave</label><select id="c_es">${espOpts(id)}</select>
+ ${ok?'':'<div class="alert bad">Este navegador no permite guardar audios; podrás escucharlos solo en esta sesión.</div>'}
+ ${e.m==='discontinuo'?'<div class="alert bad">Canto discontinuo: escuchar como referencia está bien, pero no uses estas pistas para educar noveles.</div>':''}
+ <p class="mut">Pasajes de canto típicos de la clase (orientativo; ajusta los nombres a tu estándar). Añade una grabación a cada uno y quedará guardada en este dispositivo, también sin conexión.</p>
+ ${xc?`<p><a href="https://xeno-canto.org/explore?query=${xc}" target="_blank" rel="noopener">Buscar grabaciones de ${esc(e.c)} en xeno-canto ↗</a> <span class="mut">(mayoría CC BY-NC-SA: cita al autor y no las uses comercialmente)</span></p>`:''}
+ ${tiposDe(e).map((t,i)=>{const k=id+'|'+t,c=clips[k];return `<div class="item" style="flex-wrap:wrap"><div style="flex:1;min-width:180px"><b>${esc(t)}</b><br><span class="mut">${c?esc(c.name)+(c.autor?' · '+esc(c.autor):''):'Sin grabación'}</span></div>
+  <div>${c?`<button class="b" data-pl="${i}">${cPlay===k?'■ Parar':'▶ Play'}</button><button class="b s" data-rm="${i}">✕</button>`:''}
+  <label class="b s" style="display:inline-block;color:var(--pri);margin:6px 6px 0 0;padding:10px 14px;border:1px solid var(--pri);border-radius:8px;min-height:44px">${c?'Cambiar':'＋ Añadir audio'}<input type="file" accept="audio/*" data-up="${i}" hidden></label></div>
+  ${c?'':''}</div>`}).join('')}
+ <label for="c_au">Autor / fuente de la grabación (se aplica a la próxima que añadas)</label><input id="c_au" placeholder="Ej.: Timo Schnabel, XC366733, CC BY-NC-SA" value="${esc(window._cau||'')}"></div>`;
+ $('#c_es').onchange=ev=>{window._ce=ev.target.value;cAu.pause();cPlay=null;rCantos()};
+ $('#c_au').oninput=ev=>window._cau=ev.target.value;
+ const tp=tiposDe(e);
+ $('#cantos').onclick=async ev=>{const b=ev.target.closest('button');if(!b)return;
+  if(b.dataset.rm!==undefined){const k=id+'|'+tp[b.dataset.rm];if(cPlay===k){cAu.pause();cPlay=null}try{await clipDel(k)}catch(x){}rCantos()}
+  if(b.dataset.pl!==undefined){const k=id+'|'+tp[b.dataset.pl];if(cPlay===k){cAu.pause();cPlay=null;rCantos();return}
+   const c=clips[k];if(cUrl)URL.revokeObjectURL(cUrl);cUrl=URL.createObjectURL(c.blob);cAu.src=cUrl;cAu.loop=false;cAu.onended=()=>{cPlay=null;rCantos()};
+   try{await cAu.play();cPlay=k}catch(x){alert('No se pudo reproducir este archivo')}rCantos()}};
+ $('#cantos').onchange=async ev=>{const f=ev.target.files&&ev.target.files[0];if(!f||ev.target.dataset.up===undefined)return;
+  const k=id+'|'+tp[ev.target.dataset.up];
+  try{await clipPut(k,{blob:f,name:f.name,autor:window._cau||''})}catch(x){alert('No se pudo guardar el audio en este navegador');return}
+  rCantos()};
+}
+
+const R={aves:rAves,escuela:rEscuela,cantos:rCantos,aviario:rAviario,cria:rCria,legal:rLegal};
 try{const t=localStorage.getItem('aviarioPro.theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark'}catch(e){}
 let t0='aves';try{t0=localStorage.getItem('aviarioPro.tab')||'aves'}catch(e){}
 go(R[t0]?t0:'aves');
